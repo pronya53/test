@@ -4305,52 +4305,72 @@ local function getCanvasInfo(part)
 	local cf = part.CFrame
 	local sz = part.Size
 
-	local axes = {
-		{ name = "Y", vec = cf.UpVector, sz = sz.Y, right = cf.RightVector, rightSz = sz.X, forward = cf.LookVector, fwdSz = sz.Z },
-		{ name = "Z", vec = cf.LookVector, sz = sz.Z, right = cf.RightVector, rightSz = sz.X, forward = cf.UpVector, fwdSz = sz.Y },
-		{ name = "X", vec = cf.RightVector, sz = sz.X, right = cf.LookVector, rightSz = sz.Z, forward = cf.UpVector, fwdSz = sz.Y }
+	-- Берём все 6 граней Part и выбираем САМУЮ БОЛЬШУЮ — это рабочая поверхность холста
+	local faces = {
+		{ n = cf.LookVector,   w = sz.X, h = sz.Y, t = sz.Z },
+		{ n = -cf.LookVector,  w = sz.X, h = sz.Y, t = sz.Z },
+		{ n = cf.RightVector,  w = sz.Z, h = sz.Y, t = sz.X },
+		{ n = -cf.RightVector, w = sz.Z, h = sz.Y, t = sz.X },
+		{ n = cf.UpVector,     w = sz.X, h = sz.Z, t = sz.Y },
+		{ n = -cf.UpVector,    w = sz.X, h = sz.Z, t = sz.Y },
 	}
+	local best = faces[1]
+	for i = 2, #faces do
+		local f = faces[i]
+		if f.w * f.h > best.w * best.h then best = f end
+	end
 
-	table.sort(axes, function(a, b)
-		return math.abs(a.vec.Y) > math.abs(b.vec.Y)
+	local normal = best.n
+	-- Предпочитаем, чтобы нормаль была обращена к игроку (для вертикальных холстов-стендов)
+	pcall(function()
+		local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+		if hrp and (normal:Dot(hrp.Position - part.Position)) < 0 then
+			normal = -normal
+		end
 	end)
 
-	local best = axes[1]
-	local normal = best.vec
-	if normal.Y < 0 then
-		normal = -normal
+	-- Оси плоскости поверхности: rightV ~ горизонталь экрана, downV ~ вертикаль экрана вниз.
+	-- Оба вектора СТРОГО перпендикулярны normal (иначе точки схлопываются в линию).
+	local cam = Workspace.CurrentCamera
+	local camRight = (cam and cam.CFrame.RightVector) or Vector3.xAxis
+	local camDown = -(cam and cam.CFrame.UpVector or Vector3.yAxis)
+
+	local function projectToPlane(v)
+		local p = v - normal * normal:Dot(v)
+		if p.Magnitude < 1e-4 then return nil end
+		return p.Unit
 	end
 
-	-- ВАЖНО: нормаль (вверх над поверхностью) должна быть ПЕРПЕНДИКУЛЯРНА right/forward.
-	-- Раньше для вертикальных холстов (стенд/мольберт, ось Z) в пару брались UpVector и RightVector —
-	-- они лежат в одной плоскости с нормалью, из-за чего точки рисунка "схлопывались" в линию на полу.
-	local rightV = best.right
-	local fwdV = best.forward
-	local function isPerp(v)
-		return math.abs(v:Dot(normal)) < 0.35
+	local rightV = projectToPlane(camRight) or projectToPlane(Vector3.xAxis) or Vector3.zAxis
+	local downV = projectToPlane(camDown)
+	if not downV then downV = normal:Cross(rightV) end
+	downV = downV - rightV * rightV:Dot(downV)
+	if downV.Magnitude < 1e-4 then
+		downV = normal:Cross(rightV)
+	else
+		downV = downV.Unit
 	end
-	if not isPerp(rightV) or not isPerp(fwdV) then
-		-- подбираем корректный ортонормированный базис в плоскости поверхности
-		local anyAxis = (math.abs(normal.X) < 0.9) and Vector3.xAxis or Vector3.yAxis
-		rightV = normal:Cross(anyAxis).Unit
-		fwdV = normal:Cross(rightV).Unit
-		-- согласовываем размеры: width вдоль rightV, height вдоль fwdV
-		local wProj = math.abs(sz.X * rightV.X) + math.abs(sz.Y * rightV.Y) + math.abs(sz.Z * rightV.Z)
-		local hProj = math.abs(sz.X * fwdV.X) + math.abs(sz.Y * fwdV.Y) + math.abs(sz.Z * fwdV.Z)
-		local surfW0 = math.max(best.rightSz, 8)
-		local surfH0 = math.max(best.fwdSz, 8)
-		if wProj < hProj then
-			rightV, fwdV = fwdV, rightV
-			surfW0, surfH0 = surfH0, surfW0
-		end
-		return surfW0, surfH0, normal, rightV, fwdV, math.max(best.sz, 0.05)
+	if downV:Dot(camDown) < 0 then downV = -downV end
+	if rightV:Dot(projectToPlane(camRight) or rightV) < 0 then rightV = -rightV end
+
+	-- Размеры поверхности вдоль выбранных осей (проекция габаритов Part на ось)
+	local function axisExtent(axisVec)
+		return math.abs(sz.X * cf.RightVector:Dot(axisVec))
+			+ math.abs(sz.Y * cf.UpVector:Dot(axisVec))
+			+ math.abs(sz.Z * cf.LookVector:Dot(axisVec))
+	end
+	local eR, eD = axisExtent(rightV), axisExtent(downV)
+	if eD > eR then
+		rightV, downV = downV, -rightV
+		eR, eD = eD, eR
 	end
 
-	local surfW = math.max(best.rightSz, 8)
-	local surfH = math.max(best.fwdSz, 8)
-	local thickness = math.max(best.sz, 0.05)
+	local surfW = math.max(eR, 1)
+	local surfH = math.max(eD, 1)
+	local thickness = math.max(best.t, 0.05)
 
-	return surfW, surfH, normal, rightV, fwdV, thickness
+	-- Возвращаем: surfW, surfH, normal, rightV, downV, thickness
+	return surfW, surfH, normal, rightV, downV, thickness
 end
 
 -- ================= УПРАВЛЕНИЕ ИНСТРУМЕНТАМИ И ЦВЕТОМ =================
@@ -4417,24 +4437,7 @@ local function setInGameColor(c3)
 		end
 	end)
 
-	-- 2. Ползунки RGB в PlayerGui (типичный UI растровых холстов в Roblox)
-	pcall(function()
-		local pg = player:FindFirstChild("PlayerGui")
-		if not pg then return end
-		for _, desc in ipairs(pg:GetDescendants()) do
-			if desc:IsA("Slider") then
-				local n = desc.Name:lower()
-				if n:find("red") or n == "r" then
-					desc:SetValue(r / 255)
-				elseif n:find("green") or n == "g" then
-					desc:SetValue(g / 255)
-				elseif n:find("blue") or n == "b" then
-					desc:SetValue(b / 255)
-				end
-			end
-	end)
-
-	-- 3. Вызов RemoteEvent для цвета, если доступен
+	-- 2. Вызов RemoteEvent для цвета, если доступен
 	pcall(function()
 		local tool = equipBrushTool()
 		local checkRemotes = {}
@@ -5223,15 +5226,33 @@ local function prepareDrawBatches(img, targetW, targetH, paletteSize, skipWhite)
 	local origW = img.Width
 	local origH = img.Height
 
-	-- Box-filter усреднение (артефактов «шаха» от point-sampling больше нет)
+	-- Box-filter усреднение с УЧЁТОМ ПРОПОРЦИЙ картинки и сетки.
+		-- Раньше при расхождении аспектов шаг выборки становился < 1 пикселя — строки сетки
+			брали одни и те же пиксели, и вместо фото рисовались горизонтальные полоски.
+	local imgAspect = origW / math.max(1, origH)
+	local gridAspect = targetW / math.max(1, targetH)
+	local effTW, effTH = targetW, targetH
+	if gridAspect > imgAspect then
+		effTH = math.max(2, math.round(targetW / imgAspect)) -- сетка шире картинки -> выше
+	else
+		effTW = math.max(2, math.round(targetH * imgAspect)) -- сетка уже картинки -> шире
+	end
+	local padX = (effTW - targetW) / 2
+	local padY = (effTH - targetH) / 2
 	local grid = {}
 	for y = 1, targetH do
 		grid[y] = {}
-		local sy0 = math.max(1, math.floor((y - 1) * (origH / targetH)) + 1)
-		local sy1 = math.min(origH, math.ceil(y * (origH / targetH)))
+		local fy0 = ((y - 1) + padY) * (origH / effTH)
+		local fy1 = (y + padY) * (origH / effTH)
+		local sy0 = math.max(1, math.floor(fy0) + 1)
+		local sy1 = math.min(origH, math.ceil(fy1))
+		if sy1 < sy0 then sy1 = sy0 end
 		for x = 1, targetW do
-			local sx0 = math.max(1, math.floor((x - 1) * (origW / targetW)) + 1)
-			local sx1 = math.min(origW, math.ceil(x * (origW / targetW)))
+			local fx0 = ((x - 1) + padX) * (origW / effTW)
+			local fx1 = (x + padX) * (origW / effTW)
+			local sx0 = math.max(1, math.floor(fx0) + 1)
+			local sx1 = math.min(origW, math.ceil(fx1))
+			if sx1 < sx0 then sx1 = sx0 end
 			local rSum, gSum, bSum, cnt = 0, 0, 0, 0
 			for sy = sy0, sy1 do
 				for sx = sx0, sx1 do
@@ -5357,17 +5378,17 @@ local function executePainting()
 	local paintMethod = tostring(Config.Paint_Method or "Input")
 
 	local preSurfW, preSurfH = getCanvasInfo(canvas)
-	local canvasAspect = preSurfW / math.max(1, preSurfH)
 	local imgAspect = PaintState.LoadedImage.Width / math.max(1, PaintState.LoadedImage.Height)
-	-- Сетка подгоняется и под пропорции картинки, и под пропорции холста (без искажений)
-	local combinedAspect = math.sqrt(imgAspect * canvasAspect)
+	-- Пропорции области рисунка на холсте (с учётом масштаба): картинка вписывается в неё без искажений
+	local regionAspect = (preSurfW * imgScale) / math.max(1, preSurfH * imgScale)
+	local fitAspect = math.min(imgAspect, regionAspect) / math.max(imgAspect, regionAspect)
 	local gridW, gridH
-	if combinedAspect >= 1 then
+	if imgAspect >= 1 then
 		gridW = targetRes
-		gridH = math.clamp(math.round(targetRes / combinedAspect), 20, 200)
+		gridH = math.clamp(math.round(targetRes * fitAspect), 20, 200)
 	else
 		gridH = targetRes
-		gridW = math.clamp(math.round(targetRes * combinedAspect), 20, 200)
+		gridW = math.clamp(math.round(targetRes * fitAspect), 20, 200)
 	end
 
 	local colorBuckets, palette, totalSegments = prepareDrawBatches(
@@ -5393,9 +5414,14 @@ local function executePainting()
 		PaintState.OrigCamType = cam.CameraType
 		PaintState.OrigCamCFrame = cam.CFrame
 		cam.CameraType = Enum.CameraType.Scriptable
-		local surfW, surfH, normVec, rightVec, fwdVec = getCanvasInfo(canvas)
-		local camHeight = math.max(surfW, surfH) * 1.05
-		cam.CFrame = CFrame.lookAt(canvas.Position + (normVec * camHeight), canvas.Position, fwdVec)
+		local surfW, surfH, normVec, rightVec, downVec = getCanvasInfo(canvas)
+		-- Камера ставится строго над ЦЕНТРОМ рисунка (иначе при уменьшенном масштабе картинка уходит за край экрана)
+		local offXc = tonumber(Config.Paint_CanvasOffsetX) or 0
+		local offYc = tonumber(Config.Paint_CanvasOffsetY) or 0
+		local imgScaleC = math.clamp(tonumber(Config.Paint_ImageScale) or 0.5, 0.05, 1)
+		local camCenter = canvas.Position + (rightVec * offXc) + (downVec * offYc)
+		local camHeight = math.max(surfW * imgScaleC, surfH * imgScaleC) * 1.3 + 8
+		cam.CFrame = CFrame.lookAt(camCenter + (normVec * camHeight), camCenter, downVec)
 		task.wait(0.2)
 	end
 
@@ -5418,17 +5444,25 @@ local function executePainting()
 	end
 
 	task.spawn(function()
-		local surfW, surfH, normVec, rightVec, fwdVec, thick = getCanvasInfo(canvas)
+		local surfW, surfH, normVec, rightVec, downVec, thick = getCanvasInfo(canvas)
 		-- Размер рисунка = масштаб от размеров холста; при малом масштабе картинка рисуется компактно
 		local effW = surfW * imgScale
 		local effH = surfH * imgScale
-		local centerPos = canvas.Position + (rightVec * offX) + (fwdVec * offY)
+		local centerPos = canvas.Position + (rightVec * offX) + (downVec * offY)
 		local surfaceOffset = normVec * (thick / 2 + 0.08)
+
+		-- Вписывание рисунка в область (letterbox): сохраняем пропорции фото внутри effW x effH
+		local drawW, drawH = effW, effH
+		if (effW / effH) > (gridW / gridH) then
+			drawW = effH * (gridW / gridH)
+		else
+			drawH = effW * (gridH / gridW)
+		end
 
 		local function gridToWorld(gx, gy)
 			local u = (gx - 0.5) / gridW - 0.5
 			local v = (gy - 0.5) / gridH - 0.5
-			return centerPos + surfaceOffset + (rightVec * (u * effW)) + (fwdVec * (v * effH))
+			return centerPos + surfaceOffset + (rightVec * (u * drawW)) + (downVec * (v * drawH))
 		end
 
 		for cIdx, bucket in ipairs(colorBuckets) do
@@ -6158,4 +6192,4 @@ end
 
 RefreshUI()
 
-видишь єтот скрипт на роблокс луа через Хено, раздел паинт можно добавить что б не фулл холст ресиловался а небольшая часть а то начало рисовать и нарисовало єто просто полоски на фулл холст
+-- [заметка пользователя] видишь єтот скрипт на роблокс луа через Хено, раздел паинт можно добавить что б не фулл холст ресиловался а небольшая часть а то начало рисовать и нарисовало єто просто полоски на фулл холст
