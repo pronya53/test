@@ -81,6 +81,9 @@ local aestheticBloom, aestheticCC = nil, nil
 local FreecamPart = nil
 local radarBlips = {}
 
+local clamp = math.clamp or function(v, lo, hi) if v < lo then return lo elseif v > hi then return hi end return v end
+local rnd = math.round or function(v) return math.floor(v + 0.5) end
+
 local hitSound = Instance.new("Sound", Workspace); hitSound.SoundId = "rbxassetid://3744371510"; hitSound.Volume = 4
 local ToxicMessages = {"Ez pz", "Sit down boy", "RICH PREMIUM 2.0 ON TOP", "Nice aim bro lol", "Go cry to admin", "1 tapped", "Skill issue"}
 local FakeCountries = {"RU", "UA", "US", "DE", "PL", "KZ", "FR", "BR"}
@@ -1618,7 +1621,7 @@ Connections["Heartbeat"] = RunService.Heartbeat:Connect(function(dt)
 	if Config.DynamicIsland and eqBars and #eqBars > 0 then
 		local t = tick() * 8
 		for idx, bar in ipairs(eqBars) do
-			local scale = math.clamp(0.2 + 0.7 * math.abs(math.sin(t + (idx * 1.2))), 0.2, 1)
+			local scale = clamp(0.2 + 0.7 * math.abs(math.sin(t + (idx * 1.2))), 0.2, 1)
 			bar.Size = UDim2.new(0, 3, scale, 0)
 		end
 	end
@@ -1678,7 +1681,7 @@ Connections["Heartbeat"] = RunService.Heartbeat:Connect(function(dt)
 						IslandCover.Image = "rbxassetid://6031075938"
 					end
 					if currentSongData.progress then
-						ProgressFill.Size = UDim2.new(math.clamp(currentSongData.progress, 0, 1), 0, 1, 0)
+						ProgressFill.Size = UDim2.new(clamp(currentSongData.progress, 0, 1), 0, 1, 0)
 					end
 				else
 					IslandTitle.Text = "Rich Premium"
@@ -2108,7 +2111,7 @@ Builders.Combat = function(parent)
 		addToggle(p, "Show FOV Circle", "ShowFOV")
 		createButton(p, "Aim Mode: " .. Config.AimMode, 180, function(b) Config.AimMode = Config.AimMode == "Camera" and "Mouse" or "Camera"; b.Text = "  Aim Mode: " .. Config.AimMode end)
 		createTextBox(p, "Radius", tostring(Config.AimRadius), function(v) Config.AimRadius = tonumber(v) or 150; if FOVCircle then FOVCircle.Radius = Config.AimRadius end end)
-		createTextBox(p, "Smoothness", tostring(Config.AimSmooth), function(v) Config.AimSmooth = math.clamp(tonumber(v) or 0.2, 0.01, 1) end)
+		createTextBox(p, "Smoothness", tostring(Config.AimSmooth), function(v) Config.AimSmooth = clamp(tonumber(v) or 0.2, 0.01, 1) end)
 		addBind(p, "Aim Assist", "Aim")
 		addToggle(p, "Spectate Cam (PIP)", "SpectateCam")
 	end)
@@ -2206,8 +2209,8 @@ Builders.Movement = function(parent)
 	addToggle(parent, "Spider (Climb)", "Spider", nil, function(p) addBind(p, "Spider", "Spider") end)
 	addToggle(parent, "Infinite Jump", "InfJump")
 	addToggle(parent, "B-Hop (CS2 Style)", "BHop", nil, function(p)
-		createTextBox(p, "Speed Mult", tostring(Config.BHopSpeed or 1.4), function(v) Config.BHopSpeed = math.clamp(tonumber(v) or 1.4, 1, 3) end)
-		createTextBox(p, "Strafe Force", tostring(Config.BHopStrafeForce or 0.12), function(v) Config.BHopStrafeForce = math.clamp(tonumber(v) or 0.12, 0.01, 0.5) end)
+		createTextBox(p, "Speed Mult", tostring(Config.BHopSpeed or 1.4), function(v) Config.BHopSpeed = clamp(tonumber(v) or 1.4, 1, 3) end)
+		createTextBox(p, "Strafe Force", tostring(Config.BHopStrafeForce or 0.12), function(v) Config.BHopStrafeForce = clamp(tonumber(v) or 0.12, 0.01, 0.5) end)
 	end)
 	addToggle(parent, "Fake Lag", "FakeLag", nil, function(p) createTextBox(p, "Lag Delay (s)", tostring(Config.FakeLagPower or 0.5), function(v) Config.FakeLagPower = tonumber(v) or 0.5 end) end)
 	addToggle(parent, "Safe High Jump", "SafeHighJump", nil, function(p) createTextBox(p, "Height", tostring(Config.SafeHighJumpPower or 15), function(v) Config.SafeHighJumpPower = tonumber(v) or 15 end) end)
@@ -2818,9 +2821,9 @@ flyVehicleTo = function(targetPos, speed)
 
 	speed = speed or (Config.Wanted_FlySpeed or 95)
 	local curY = root.Position.Y
-	local targetY = math.clamp(targetPos.Y, -300, 1500)
-	local flyHeight = math.clamp(Config.Wanted_FlyHeight or 55, 15, 90)
-	local cruiseHeight = math.clamp(math.max(curY, targetY) + flyHeight, curY + 12, curY + 80)
+	local targetY = clamp(targetPos.Y, -300, 1500)
+	local flyHeight = clamp(Config.Wanted_FlyHeight or 55, 15, 90)
+	local cruiseHeight = clamp(math.max(curY, targetY) + flyHeight, curY + 12, curY + 80)
 	local waypoints = {
 		Vector3.new(root.Position.X, cruiseHeight, root.Position.Z),
 		Vector3.new(targetPos.X, cruiseHeight, targetPos.Z),
@@ -2900,7 +2903,7 @@ local function flyCharacterTo(targetPos, speed, shouldCancel)
 
 	local waypoints = {}
 	if dist > 35 then
-		local flyHeight = math.clamp(Config.Wanted_FlyHeight or 45, 18, 75)
+		local flyHeight = clamp(Config.Wanted_FlyHeight or 45, 18, 75)
 		local cruiseY = math.max(curPos.Y, targetPos.Y) + flyHeight
 		table.insert(waypoints, Vector3.new(curPos.X, cruiseY, curPos.Z))
 		table.insert(waypoints, Vector3.new(targetPos.X, cruiseY, targetPos.Z))
@@ -4005,16 +4008,16 @@ Builders.Music = function(parent)
 	createButton(parent, "⏹ Stop", btnW, function() stopMusic() end)
 
 	createTextBox(parent, "Speed (x)", tostring(Config.Music_Speed), function(v)
-		Config.Music_Speed = math.clamp(tonumber(v) or 1, 0.1, 10)
+		Config.Music_Speed = clamp(tonumber(v) or 1, 0.1, 10)
 	end)
 	createTextBox(parent, "Note Delay (s)", tostring(Config.Music_Delay), function(v)
-		Config.Music_Delay = math.clamp(tonumber(v) or 0.12, 0.02, 2)
+		Config.Music_Delay = clamp(tonumber(v) or 0.12, 0.02, 2)
 	end)
 	createTextBox(parent, "Key Hold (s)", tostring(Config.Music_Hold), function(v)
-		Config.Music_Hold = math.clamp(tonumber(v) or 0.04, 0.01, 0.5)
+		Config.Music_Hold = clamp(tonumber(v) or 0.04, 0.01, 0.5)
 	end)
 	createTextBox(parent, "Start Delay (s)", tostring(Config.Music_StartDelay), function(v)
-		Config.Music_StartDelay = math.clamp(tonumber(v) or 3, 0, 15)
+		Config.Music_StartDelay = clamp(tonumber(v) or 3, 0, 15)
 	end)
 	addToggle(parent, "Loop Song", "Music_Loop")
 
@@ -4068,7 +4071,7 @@ pcall(function() VIM = game:GetService("VirtualInputManager") end)
 
 local function setPaintStatus(text, progress)
 	PaintState.Status = text
-	if progress then PaintState.Progress = math.clamp(progress, 0, 1) end
+	if progress then PaintState.Progress = clamp(progress, 0, 1) end
 	for i, lbl in pairs(PaintState.Labels) do
 		if lbl and lbl.Parent then
 			pcall(function() lbl.Text = "[PAINT] " .. text end)
@@ -4274,9 +4277,9 @@ local function equipBrushTool()
 end
 
 local function setInGameColor(c3)
-	local r = math.clamp(math.floor(c3.R * 255), 0, 255)
-	local g = math.clamp(math.floor(c3.G * 255), 0, 255)
-	local b = math.clamp(math.floor(c3.B * 255), 0, 255)
+	local r = clamp(math.floor(c3.R * 255), 0, 255)
+	local g = clamp(math.floor(c3.G * 255), 0, 255)
+	local b = clamp(math.floor(c3.B * 255), 0, 255)
 	local hex = string.format("%02X%02X%02X", r, g, b)
 
 	pcall(function()
@@ -4393,8 +4396,8 @@ local function decodeBMP(raw)
 		Width = width,
 		Height = height,
 		GetPixel = function(self, x, y)
-			x = math.clamp(x, 1, width)
-			y = math.clamp(y, 1, height)
+			x = clamp(x, 1, width)
+			y = clamp(y, 1, height)
 			local rowY = isFlipped and (height - y) or (y - 1)
 			local pos = dataOffset + rowY * rowSize + (x - 1) * bytesPerPixel + 1
 			if pos + 2 > #raw then return Color3.new(1, 1, 1), 1 end
@@ -4816,8 +4819,8 @@ end
 		Width = width,
 		Height = height,
 		GetPixel = function(self, x, y)
-			x = math.clamp(x, 1, width)
-			y = math.clamp(y, 1, height)
+			x = clamp(x, 1, width)
+			y = clamp(y, 1, height)
 			local row = rows[y]
 			if not row then return Color3.new(0, 0, 0), 0 end
 
@@ -5065,12 +5068,14 @@ local function prepareDrawBatches(img, targetW, targetH, paletteSize, skipWhite)
 	local gridAspect = targetW / math.max(1, targetH)
 	local effTW, effTH = targetW, targetH
 	if gridAspect > imgAspect then
-		effTH = math.max(2, math.round(targetW / imgAspect))
+		effTH = math.max(2, rnd(targetW / imgAspect))
 	else
-		effTW = math.max(2, math.round(targetH * imgAspect))
+		effTW = math.max(2, rnd(targetH * imgAspect))
 	end
 	local padX = (effTW - targetW) / 2
 	local padY = (effTH - targetH) / 2
+	local drawW = effTW - 2 * padX
+	local drawH = effTH - 2 * padY
 	local grid = {}
 	for y = 1, targetH do
 		grid[y] = {}
@@ -5079,7 +5084,7 @@ local function prepareDrawBatches(img, targetW, targetH, paletteSize, skipWhite)
 		local sy0 = math.max(1, math.floor(fy0) + 1)
 		local sy1 = math.min(origH, math.ceil(fy1))
 		if sy1 < sy0 then sy1 = sy0 end
-		for x = 1, targetW do
+		for x = 1, drawW do
 			local fx0 = ((x - 1) + padX) * (origW / effTW)
 			local fx1 = (x + padX) * (origW / effTW)
 			local sx0 = math.max(1, math.floor(fx0) + 1)
@@ -5105,7 +5110,7 @@ local function prepareDrawBatches(img, targetW, targetH, paletteSize, skipWhite)
 		end
 	end
 
-	local palette = extractPalette(grid, targetW, targetH, paletteSize or 24)
+	local palette = extractPalette(grid, drawW, drawH, paletteSize or 24)
 
 	local colorBuckets = {}
 	for i = 1, #palette do
@@ -5117,11 +5122,11 @@ local function prepareDrawBatches(img, targetW, targetH, paletteSize, skipWhite)
 
 	local totalSegments = 0
 
-	for y = 1, targetH do
+	for y = 1, drawH do
 		local curColorIdx = nil
 		local startX = nil
 
-		for x = 1, targetW do
+		for x = 1, drawW do
 			local c = grid[y][x]
 			local isWhite = skipWhite and (c.R > 0.93 and c.G > 0.93 and c.B > 0.93)
 			local palIdx = isWhite and 0 or mapToPalette(c, palette)
@@ -5143,14 +5148,14 @@ local function prepareDrawBatches(img, targetW, targetH, paletteSize, skipWhite)
 		if curColorIdx and curColorIdx > 0 and startX then
 			table.insert(colorBuckets[curColorIdx].Segments, {
 				StartX = startX,
-				EndX = targetW,
+				EndX = drawW,
 				Y = y
 			})
 			totalSegments = totalSegments + 1
 		end
 	end
 
-	return colorBuckets, palette, totalSegments, targetW, targetH
+	return colorBuckets, palette, totalSegments, drawW, drawH
 end
 
 local function stopPainting()
@@ -5197,32 +5202,19 @@ local function executePainting()
 	setPaintStatus("Анализ и подготовка штрихов (RLE)...")
 	task.wait(0.05)
 
-	local targetRes = math.clamp(tonumber(Config.Paint_Resolution) or 90, 30, 200)
-	local paletteSize = math.clamp(tonumber(Config.Paint_PaletteSize) or 24, 6, 64)
+	local targetRes = clamp(tonumber(Config.Paint_Resolution) or 90, 30, 200)
+	local paletteSize = clamp(tonumber(Config.Paint_PaletteSize) or 24, 6, 64)
 	local skipWhite = (Config.Paint_SkipWhite ~= false)
 	local delayTime = math.max(0.003, tonumber(Config.Paint_Delay) or 0.015)
-	local imgScale = math.clamp(tonumber(Config.Paint_ImageScale) or 0.5, 0.05, 1)
+	local imgScale = clamp(tonumber(Config.Paint_ImageScale) or 0.5, 0.05, 1)
 	local offX = tonumber(Config.Paint_CanvasOffsetX) or 0
 	local offY = tonumber(Config.Paint_CanvasOffsetY) or 0
 	local paintMethod = tostring(Config.Paint_Method or "Input")
 
-	local preSurfW, preSurfH = getCanvasInfo(canvas)
-	local imgAspect = PaintState.LoadedImage.Width / math.max(1, PaintState.LoadedImage.Height)
-	local regionAspect = (preSurfW * imgScale) / math.max(1, preSurfH * imgScale)
-	local fitAspect = math.min(imgAspect, regionAspect) / math.max(imgAspect, regionAspect)
-	local gridW, gridH
-	if imgAspect >= 1 then
-		gridW = targetRes
-		gridH = math.clamp(math.round(targetRes * fitAspect), 20, 200)
-	else
-		gridH = targetRes
-		gridW = math.clamp(math.round(targetRes * fitAspect), 20, 200)
-	end
-
-	local colorBuckets, palette, totalSegments = prepareDrawBatches(
+	local colorBuckets, palette, totalSegments, gridW, gridH = prepareDrawBatches(
 		PaintState.LoadedImage,
-		gridW,
-		gridH,
+		targetRes,
+		targetRes,
 		paletteSize,
 		skipWhite
 	)
@@ -5245,9 +5237,13 @@ local function executePainting()
 		local surfW, surfH, normVec, rightVec, downVec = getCanvasInfo(canvas)
 		local offXc = tonumber(Config.Paint_CanvasOffsetX) or 0
 		local offYc = tonumber(Config.Paint_CanvasOffsetY) or 0
-		local imgScaleC = math.clamp(tonumber(Config.Paint_ImageScale) or 0.5, 0.05, 1)
+		local imgScaleC = clamp(tonumber(Config.Paint_ImageScale) or 0.5, 0.05, 1)
+		local regW = surfW * imgScaleC
+		local regH = surfH * imgScaleC
+		local drawSpanW = regW * clamp(gridW / gridH, 0.02, 1)
+		local drawSpanH = regH * clamp(gridH / gridW, 0.02, 1)
 		local camCenter = canvas.Position + (rightVec * offXc) + (downVec * offYc)
-		local camHeight = math.max(surfW * imgScaleC, surfH * imgScaleC) * 1.3 + 8
+		local camHeight = math.max(drawSpanW, drawSpanH) * 1.35 + 8
 		cam.CFrame = CFrame.lookAt(camCenter + (normVec * camHeight), camCenter, downVec)
 		task.wait(0.2)
 	end
@@ -5277,12 +5273,15 @@ local function executePainting()
 		local centerPos = canvas.Position + (rightVec * offX) + (downVec * offY)
 		local surfaceOffset = normVec * (thick / 2 + 0.08)
 
-		local drawW, drawH = effW, effH
-		if (effW / effH) > (gridW / gridH) then
-			drawW = effH * (gridW / gridH)
-		else
-			drawH = effW * (gridH / gridW)
-		end
+                local ratioWH = gridW / math.max(1, gridH)
+                local drawW, drawH
+                if ratioWH >= 1 then
+                        drawW = math.min(effW, effH * ratioWH)
+                        drawH = drawW / ratioWH
+                else
+                        drawH = math.min(effH, effW / ratioWH)
+                        drawW = drawH * ratioWH
+                end
 
 		local function gridToWorld(gx, gy)
 			local u = (gx - 0.5) / gridW - 0.5
@@ -5316,9 +5315,9 @@ local function executePainting()
 				local s1, on1 = cam:WorldToViewportPoint(pStart)
 				local s2, on2 = cam:WorldToViewportPoint(pEnd)
 
+				local skipStroke = false
 				if paintMethod ~= "Remote" and (not on1 or not on2) then
-					PaintState.CompletedStrokes = PaintState.CompletedStrokes + 1
-					do end --[[continue]]
+					skipStroke = true
 				end
 
 				if paintMethod ~= "Remote" and on1 and on2 and VIM then
@@ -5339,7 +5338,7 @@ local function executePainting()
 						mouse1click()
 					end)
 				end
-
+				if not skipStroke then
 				PaintState.CompletedStrokes = PaintState.CompletedStrokes + 1
 				local prog = PaintState.CompletedStrokes / totalSegments
 
@@ -5351,6 +5350,7 @@ local function executePainting()
 				end
 
 				task.wait(delayTime)
+				end
 			end
 		end
 
@@ -5496,9 +5496,9 @@ Builders.Paint = function(parent)
 					if img.Height > img.Width then dsH = 160; dsW = math.max(1, math.floor(160 * (img.Width / math.max(1, img.Height)))) end
 					local cv = gVim:CreateCanvas(dsW, dsH)
 					for py = 0, dsH - 1 do
-						local srcY = math.clamp(math.floor(py * (img.Height / dsH)) + 1, 1, img.Height)
+						local srcY = clamp(math.floor(py * (img.Height / dsH)) + 1, 1, img.Height)
 						for px = 0, dsW - 1 do
-							local srcX = math.clamp(math.floor(px * (img.Width / dsW)) + 1, 1, img.Width)
+							local srcX = clamp(math.floor(px * (img.Width / dsW)) + 1, 1, img.Width)
 							local col, alpha = img:GetPixel(srcX, srcY)
 							if col and (alpha or 1) >= 0.25 then
 								cv:SetPixel(px, py, col)
@@ -5666,19 +5666,19 @@ Builders.Paint = function(parent)
 	local tSet = Instance.new("TextLabel", parent); tSet.Size = UDim2.new(1,0,0,22); tSet.BackgroundTransparency = 1; tSet.Text = "⚙ НАСТРОЙКИ КАЧЕСТВА И СКОРОСТИ"; tSet.Font = Enum.Font.GothamBold; tSet.TextColor3 = Color3.fromRGB(240,240,255); tSet.TextSize = 12
 
 	createTextBox(parent, "Детализация (ширина px)", tostring(Config.Paint_Resolution or 90), function(v)
-		Config.Paint_Resolution = math.clamp(tonumber(v) or 90, 30, 200)
+		Config.Paint_Resolution = clamp(tonumber(v) or 90, 30, 200)
 	end)
 
 	createTextBox(parent, "Кол-во цветов палитры", tostring(Config.Paint_PaletteSize or 24), function(v)
-		Config.Paint_PaletteSize = math.clamp(tonumber(v) or 24, 6, 64)
+		Config.Paint_PaletteSize = clamp(tonumber(v) or 24, 6, 64)
 	end)
 
 	createTextBox(parent, "Задержка штриха (сек)", tostring(Config.Paint_Delay or 0.015), function(v)
-		Config.Paint_Delay = math.clamp(tonumber(v) or 0.015, 0.002, 0.2)
+		Config.Paint_Delay = clamp(tonumber(v) or 0.015, 0.002, 0.2)
 	end)
 
 	createTextBox(parent, "Размер фото на холсте (0.05 - 1)", tostring(Config.Paint_ImageScale or 0.5), function(v)
-		Config.Paint_ImageScale = math.clamp(tonumber(v) or 0.5, 0.05, 1)
+		Config.Paint_ImageScale = clamp(tonumber(v) or 0.5, 0.05, 1)
 	end)
 
 	createTextBox(parent, "Сдвиг рисунка по горизонтали (studs)", tostring(Config.Paint_CanvasOffsetX or 0), function(v)
@@ -5753,7 +5753,7 @@ local function buildDropdownUI()
 	local screenW = Workspace.CurrentCamera.ViewportSize.X
 	local numTabs = #mainTabs
 	local spacing = 8
-	local colW = math.clamp(math.floor((screenW - 40 - (numTabs - 1) * spacing) / numTabs), 130, 185)
+	local colW = clamp(math.floor((screenW - 40 - (numTabs - 1) * spacing) / numTabs), 130, 185)
 	local totalW = numTabs * colW + (numTabs - 1) * spacing
 	local startX = math.max(16, math.floor((screenW - totalW) / 2))
 	
