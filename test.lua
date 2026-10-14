@@ -1,4 +1,3 @@
--- Защита от дублирования GUI
 if game.CoreGui:FindFirstChild("RichPremiumGui") then
 	game.CoreGui.RichPremiumGui:Destroy()
 end
@@ -12,7 +11,6 @@ local TweenService = game:GetService("TweenService")
 local Lighting = game:GetService("Lighting")
 local HttpService = game:GetService("HttpService")
 
--- ================= ГЛОБАЛЬНЫЙ КОНФИГ И БИНДЫ =================
 local Config = {
 	ESP = false, Names = false, Boxes = false, Tracers = false, Distance = true, Friends = false, ESPMode = "Default",
 	Skeleton = false, Chams = false, 
@@ -27,13 +25,12 @@ local Config = {
 	Speed = false, SpeedMult = 2, SpeedMode = "WalkSpeed", Fly = false, FlySpeed = 50, NoClip = false, InfJump = false, Spider = false, BHop = false, BHopSpeed = 1.4, BHopStrafeForce = 0.12, Freecam = false, FreecamSpeed = 100,
 	FakeLag = false, FakeLagPower = 0.5, SafeHighJump = false, SafeHighJumpPower = 15,
 	
-	-- Paint Bot
 	Paint_Active = false, Paint_FilePath = "", Paint_Scale = 1, Paint_Delay = 0.02,
 	Paint_Quality = "High", Paint_StartX = 0, Paint_StartY = 0, Paint_SkipWhite = true,
 	Paint_MaxWidth = 400, Paint_MaxHeight = 400, Paint_BrushSize = 0.4, Paint_Dithering = false,
-	Paint_ImageScale = 0.5, -- размер рисунка относительно холста (0.05..1)
-	Paint_CanvasOffsetX = 0, Paint_CanvasOffsetY = 0, -- сдвиг центра рисунка на холсте (studs)
-	Paint_Method = "Input", -- Input (VIM-клики поверх окна), Remote, Mouse
+	Paint_ImageScale = 0.5,
+	Paint_CanvasOffsetX = 0, Paint_CanvasOffsetY = 0,
+	Paint_Method = "Input",
 	SpectateCam = false,
 	
 	XRay = false, FullBright = false, NightMode = false, Wireframe = false, FOV = false, FOVValue = 90, ThemeFog = false, AestheticWorld = false,
@@ -44,7 +41,6 @@ local Config = {
 	Notifications = true,
 	RGBUI = false, LoadWorldSettings = true, UIStyle = "Modern",
 	
-	-- Games Hub / Wanted Mode
 	SelectedGame = "Wanted",
 	Wanted_AutoBank = false,
 	Wanted_AutoATM = false,
@@ -63,7 +59,6 @@ local Binds = { ESP = nil, Aim = nil, Speed = nil, Fly = nil, NoClip = nil, Free
 local MenuVisible = true
 local MenuAnimating = false
 
--- ================= ВНУТРЕННИЕ ПЕРЕМЕННЫЕ =================
 local Connections = {}
 local espBoxes, highlights, nameTags, distanceTags, tracers, ipTags, skeletonLines = {}, {}, {}, {}, {}, {}, {}
 local originalHitboxes, originalTransparencies, originalMaterials = {}, {}, {}
@@ -96,11 +91,9 @@ local specChar = nil; local specClone = nil; local specPartsMap = {}
 local specEnvFolder = nil; local lastEnvUpdate = 0; local specEnvMap = {}
 local spec3DTracer = nil
 
--- Структуры скелета
 local R15_Bones = { {"Head", "UpperTorso"}, {"UpperTorso", "LowerTorso"}, {"UpperTorso", "LeftUpperArm"}, {"LeftUpperArm", "LeftLowerArm"}, {"LeftLowerArm", "LeftHand"}, {"UpperTorso", "RightUpperArm"}, {"RightUpperArm", "RightLowerArm"}, {"RightLowerArm", "RightHand"}, {"LowerTorso", "LeftUpperLeg"}, {"LeftUpperLeg", "LeftLowerLeg"}, {"LeftLowerLeg", "LeftFoot"}, {"LowerTorso", "RightUpperLeg"}, {"RightUpperLeg", "RightLowerLeg"}, {"RightLowerLeg", "RightFoot"} }
 local R6_Bones = { {"Head", "Torso"}, {"Torso", "Left Arm"}, {"Torso", "Right Arm"}, {"Torso", "Left Leg"}, {"Torso", "Right Leg"} }
 
--- ================= 3D ЭЛЕМЕНТЫ (TARGET HUD & SELF AURA) =================
 local TargetAura = { Cubes = {}, Rhombus = nil, Ring = nil, Atom = {}, Crown = {}, Helix = {}, Constellation = {}, VoidRing = nil, Wings = {} }
 local SelfCrown = {}
 
@@ -142,7 +135,6 @@ for i = 1, 6 do
 end
 TargetAura.VoidRing = Instance.new("Part"); TargetAura.VoidRing.Size = Vector3.new(0.1, 5, 5); TargetAura.VoidRing.Material = Enum.Material.Neon; TargetAura.VoidRing.Anchored = true; TargetAura.VoidRing.CanCollide = false; TargetAura.VoidRing.Transparency = 1; TargetAura.VoidRing.Shape = Enum.PartType.Cylinder; TargetAura.VoidRing.Parent = Workspace
 
--- ================= ТЕМЫ ОФОРМЛЕНИЯ =================
 local Themes = {
 	RichDark = { BG = Color3.fromRGB(5, 5, 5), Panel = Color3.fromRGB(12, 12, 15), Btn = Color3.fromRGB(18, 18, 22), BtnHover = Color3.fromRGB(25, 25, 30), Accent = Color3.fromRGB(138, 43, 226), Text = Color3.fromRGB(240, 240, 240) },
 	PurpleBlack = { BG = Color3.fromRGB(10, 5, 15), Panel = Color3.fromRGB(20, 10, 30), Btn = Color3.fromRGB(30, 15, 45), BtnHover = Color3.fromRGB(50, 25, 75), Accent = Color3.fromRGB(180, 0, 255), Text = Color3.fromRGB(240, 240, 240) },
@@ -156,14 +148,12 @@ local ActiveThemeName = "RichDark"
 local ActiveTheme = Themes[ActiveThemeName]
 local UI_Elements = { Strokes = {}, Texts = {}, BG = {} }
 
--- ================= DRAWING API =================
 pcall(function()
 	FOVCircle = Drawing.new("Circle"); FOVCircle.Color = ActiveTheme.Accent; FOVCircle.Thickness = 1.5; FOVCircle.NumSides = 60; FOVCircle.Visible = false
 	CrosshairX = Drawing.new("Line"); CrosshairX.Color = Color3.fromRGB(0, 255, 0); CrosshairX.Thickness = 2; CrosshairX.Visible = false
 	CrosshairY = Drawing.new("Line"); CrosshairY.Color = Color3.fromRGB(0, 255, 0); CrosshairY.Thickness = 2; CrosshairY.Visible = false
 end)
 
--- ================= СОЗДАНИЕ UI (GLASSMORPHISM) =================
 local ScreenGui = Instance.new("ScreenGui", game:GetService("CoreGui")); ScreenGui.Name = "RichPremiumGui"; ScreenGui.ResetOnSpawn = false
 
 local function rCorner(o, r) Instance.new("UICorner", o).CornerRadius = UDim.new(0, r or 6) end
@@ -194,7 +184,6 @@ UserInputService.InputChanged:Connect(function(input)
 	end
 end)
 
--- ================= MODERN DASHBOARD UI (STYLE 3 - BENTO / ACRYLIC HUB) =================
 local ModernFrame = Instance.new("Frame", ScreenGui)
 ModernFrame.Name = "ModernFrame"
 ModernFrame.Size = UDim2.new(0, 730, 0, 490)
@@ -355,7 +344,6 @@ end)
 	end)
 end
 
--- ================= NOTIFICATIONS CONTAINER (TOASTS) =================
 local NotifContainer = Instance.new("Frame", ScreenGui)
 NotifContainer.Name = "NotifContainer"
 NotifContainer.Size = UDim2.new(0, 260, 1, -40)
@@ -416,7 +404,6 @@ local function showNotification(title, msg, duration, nColor)
 	end)
 end
 
--- ================= DYNAMIC ISLAND (APPLE STYLE) =================
 local DynamicIsland, islandStroke, islandGrad, IslandTitle, IslandArtist, IslandStats, IslandCover, ProgressFill, eqBars
 do
 	DynamicIsland = Instance.new("Frame", ScreenGui)
@@ -439,7 +426,6 @@ do
 	})
 	table.insert(UI_Elements.BG, DynamicIsland)
 
-	-- Equalizer bars container (visualizer on left)
 	local eqFrame = Instance.new("Frame", DynamicIsland)
 	eqFrame.Name = "EqFrame"
 	eqFrame.Size = UDim2.new(0, 22, 0, 18)
@@ -458,7 +444,6 @@ do
 		table.insert(UI_Elements.Strokes, {Color = bar.BackgroundColor3, Parent = bar})
 	end
 
-	-- Album Cover thumbnail (avatar / cover art)
 	IslandCover = Instance.new("ImageLabel", DynamicIsland)
 	IslandCover.Name = "IslandCover"
 	IslandCover.Size = UDim2.new(0, 24, 0, 24)
@@ -469,7 +454,6 @@ do
 	IslandCover.ScaleType = Enum.ScaleType.Fit
 rCorner(IslandCover, 6)
 
--- Main Title & Artist text container
 local textContainer = Instance.new("Frame", DynamicIsland)
 textContainer.Name = "TextContainer"
 textContainer.Size = UDim2.new(1, -150, 1, 0)
@@ -502,7 +486,6 @@ textContainer.ClipsDescendants = true
 	IslandArtist.Text = "v2.1 • Ready"
 	table.insert(UI_Elements.Texts, IslandArtist)
 
-	-- Right side: Stats Pill
 	IslandStats = Instance.new("TextLabel", DynamicIsland)
 	IslandStats.Name = "IslandStats"
 	IslandStats.Size = UDim2.new(0, 65, 0, 20)
@@ -516,7 +499,6 @@ textContainer.ClipsDescendants = true
 	rCorner(IslandStats, 10)
 	table.insert(UI_Elements.Texts, IslandStats)
 
-	-- Progress Bar (visible when expanded)
 	local ProgressBg = Instance.new("Frame", DynamicIsland)
 	ProgressBg.Name = "ProgressBg"
 	ProgressBg.Size = UDim2.new(1, -30, 0, 4)
@@ -533,7 +515,6 @@ textContainer.ClipsDescendants = true
 	rCorner(ProgressFill, 2)
 	table.insert(UI_Elements.Strokes, {Color = ProgressFill.BackgroundColor3, Parent = ProgressFill})
 
--- Media Control Remote Sender
 local function sendMediaControl(action)
 	task.spawn(function()
 		pcall(function()
@@ -551,7 +532,6 @@ local function sendMediaControl(action)
 	end)
 end
 
--- Media Control Buttons (Prev, Play/Pause, Next)
 local MediaCtrlFrame = Instance.new("Frame", DynamicIsland)
 MediaCtrlFrame.Name = "MediaCtrlFrame"
 MediaCtrlFrame.Size = UDim2.new(0, 105, 0, 24)
@@ -596,7 +576,6 @@ local btnPrev = createMediaBtn("⏮", 0, 28, "prev")
 local btnPlay = createMediaBtn("⏯", 34, 34, "play_pause")
 local btnNext = createMediaBtn("⏭", 74, 28, "next")
 
--- Island Expand / Collapse animation
 local islandExpanded = false
 local function toggleIslandExpand(state)
 	if state == nil then islandExpanded = not islandExpanded else islandExpanded = state end
@@ -647,7 +626,6 @@ local function toggleIslandExpand(state)
 	end
 end
 
--- Click button to expand or collapse
 local islandBtn = Instance.new("TextButton", DynamicIsland)
 islandBtn.Size = UDim2.new(1, 0, 1, 0)
 islandBtn.BackgroundTransparency = 1
@@ -721,7 +699,6 @@ spec3DTracer.CanCollide = false
 spec3DTracer.Material = Enum.Material.Neon
 spec3DTracer.Transparency = 1
 
--- Radar HUD
 local RadarFrame = Instance.new("Frame", ScreenGui); RadarFrame.Size = UDim2.new(0, 200, 0, 200); RadarFrame.Position = UDim2.new(0, 20, 0, 20); RadarFrame.BackgroundColor3 = ActiveTheme.BG; RadarFrame.BackgroundTransparency = 0.25; RadarFrame.ClipsDescendants = true; RadarFrame.Visible = false; RadarFrame.Active = true; RadarFrame.Draggable = true; rCorner(RadarFrame, 100); rStroke(RadarFrame, ActiveTheme.Accent, 2); table.insert(UI_Elements.BG, RadarFrame)
 local rLineX = Instance.new("Frame", RadarFrame); rLineX.Size = UDim2.new(1, 0, 0, 1); rLineX.Position = UDim2.new(0, 0, 0.5, 0); rLineX.BackgroundColor3 = ActiveTheme.Accent; rLineX.BackgroundTransparency = 0.5; rLineX.BorderSizePixel = 0; table.insert(UI_Elements.Strokes, {Color = rLineX.BackgroundColor3, Parent = rLineX})
 local rLineY = Instance.new("Frame", RadarFrame); rLineY.Size = UDim2.new(0, 1, 1, 0); rLineY.Position = UDim2.new(0.5, 0, 0, 0); rLineY.BackgroundColor3 = ActiveTheme.Accent; rLineY.BackgroundTransparency = 0.5; rLineY.BorderSizePixel = 0; table.insert(UI_Elements.Strokes, {Color = rLineY.BackgroundColor3, Parent = rLineY})
@@ -743,7 +720,6 @@ local function sendToxicMessage()
 	pcall(function() game:GetService("TextChatService").TextChannels.RBXGeneral:SendAsync(msg) end)
 end
 
--- ================= ФУНКЦИИ РЕНДЕРИНГА UI =================
 local activeTabBtn = nil
 local DropdownFrames = {}
 local function isDropdownChild(parent)
@@ -1095,7 +1071,6 @@ local function addBind(parent, featureName, bindKey)
 	end)
 end
 
--- ================= ЭФФЕКТЫ И МИР =================
 local function ApplyWorldSettings()
 	if Config.FullBright then Lighting.GlobalShadows = false; Lighting.Ambient = Color3.new(1,1,1); Lighting.OutdoorAmbient = Color3.new(1,1,1) else Lighting.GlobalShadows = origGlobalShadows or true; Lighting.Ambient = origAmbient or Color3.fromRGB(127,127,127); Lighting.OutdoorAmbient = origOutdoorAmbient or Color3.fromRGB(127,127,127) end
 	if Config.NightMode then Lighting.Ambient = Color3.fromRGB(10,10,30); Lighting.Brightness = 0.5; Lighting.ClockTime = 0 else Lighting.Brightness = origBrightness or 1; Lighting.ClockTime = origClockTime or 14 end
@@ -1157,7 +1132,6 @@ local function DrawSkeleton(char, color)
 	end
 end
 
--- ================= УТИЛИТЫ =================
 local function getRoleColor(plr)
 	local function hasTool(container, ...)
 		if not container then return false end
@@ -1173,11 +1147,11 @@ local function getRoleColor(plr)
 	end
 	
 	if hasTool(plr:FindFirstChild("Backpack"), "knife", "blade", "saw", "scythe") or hasTool(plr.Character, "knife", "blade", "saw", "scythe") then
-		return Color3.fromRGB(255, 0, 0) -- Murderer (Red)
+		return Color3.fromRGB(255, 0, 0)
 	elseif hasTool(plr:FindFirstChild("Backpack"), "gun", "revolver", "pistol", "blaster") or hasTool(plr.Character, "gun", "revolver", "pistol", "blaster") then
-		return Color3.fromRGB(0, 0, 255) -- Sheriff (Blue)
+		return Color3.fromRGB(0, 0, 255)
 	else
-		return Color3.fromRGB(0, 255, 0) -- Innocent (Green)
+		return Color3.fromRGB(0, 255, 0)
 	end
 end
 
@@ -1212,7 +1186,6 @@ local function getClosestToCursor()
 	return closest
 end
 
--- ================= ОСНОВНЫЕ ЦИКЛЫ =================
 Connections["MainLoop"] = RunService.RenderStepped:Connect(function(dt)
 	if MenuVisible then UserInputService.MouseBehavior = Enum.MouseBehavior.Default; UserInputService.MouseIconEnabled = true end
 	
@@ -1262,7 +1235,6 @@ Connections["MainLoop"] = RunService.RenderStepped:Connect(function(dt)
 	if Config.ThemeFog then Lighting.FogColor = accentColor end
 	if Config.AestheticWorld and aestheticCC then aestheticCC.TintColor = Color3.new(0.4 + accentColor.R*0.6, 0.4 + accentColor.G*0.6, 0.4 + accentColor.B*0.6) end
 
-	-- RADAR 2D
 	if Config.Radar and lRoot then
 		RadarFrame.Visible = true
 		local camCFrame = Workspace.CurrentCamera.CFrame
@@ -1297,7 +1269,6 @@ Connections["MainLoop"] = RunService.RenderStepped:Connect(function(dt)
 	
 	local currentTarget = getClosestToCursor()
 
-	-- SPECTATE CAM
 	if Config.SpectateCam and currentTarget and currentTarget.Character and currentTarget.Character:FindFirstChild("HumanoidRootPart") then
 	    SpecFrame.Visible = true
 	    
@@ -1393,7 +1364,6 @@ Connections["MainLoop"] = RunService.RenderStepped:Connect(function(dt)
 	
 	    if Connections["SpecTracer"] then Connections["SpecTracer"].Visible = false end
 	
-	    -- 3D Tracer in PIP
 	    if player.Character and player.Character:FindFirstChild("Head") and currentTarget.Character:FindFirstChild("Head") then
 	        local origin = player.Character.Head.Position
 	        local dest = currentTarget.Character.Head.Position
@@ -1425,7 +1395,6 @@ Connections["MainLoop"] = RunService.RenderStepped:Connect(function(dt)
 	    end
 	end
 
-	-- ================= АНИМАЦИЯ TARGET HUD =================
 	local targetRadiusDst = (Config.TargetESP and currentTarget) and 3 or 0
 	currentOrbitRadius = currentOrbitRadius + (targetRadiusDst - currentOrbitRadius) * 12 * dt
 	
@@ -1553,7 +1522,6 @@ Connections["MainLoop"] = RunService.RenderStepped:Connect(function(dt)
 		end
 	end
 
-	-- FREECAM LOGIC
 	if Config.Freecam then
 		if not FreecamPart then
 			FreecamPart = Instance.new("Part", Workspace); FreecamPart.Anchored = true; FreecamPart.CanCollide = false; FreecamPart.Transparency = 1
@@ -1647,7 +1615,6 @@ Connections["Heartbeat"] = RunService.Heartbeat:Connect(function(dt)
 		end
 	end
 
-	-- Equalizer animation in Dynamic Island
 	if Config.DynamicIsland and eqBars and #eqBars > 0 then
 		local t = tick() * 8
 		for idx, bar in ipairs(eqBars) do
@@ -1656,7 +1623,6 @@ Connections["Heartbeat"] = RunService.Heartbeat:Connect(function(dt)
 		end
 	end
 
-	-- Music Polling from PC Bridge
 	if Config.DynamicIsland and Config.IslandMusic and (tick() - lastMusicPoll >= 1.0) then
 		lastMusicPoll = tick()
 		task.spawn(function()
@@ -1770,7 +1736,7 @@ Connections["Heartbeat"] = RunService.Heartbeat:Connect(function(dt)
 	end
 
 	for _, t in pairs(Players:GetPlayers()) do
-		if t == player then continue end
+		local skipSelf = (t == player)
 		local char = t.Character
 		local alive = char and char:FindFirstChild("HumanoidRootPart") and char:FindFirstChild("Humanoid") and char.Humanoid.Health > 0
 
@@ -1808,7 +1774,7 @@ Connections["Heartbeat"] = RunService.Heartbeat:Connect(function(dt)
 			if originalHitboxes[t] and char and char:FindFirstChild("HumanoidRootPart") then
 				char.HumanoidRootPart.Size = originalHitboxes[t].S; char.HumanoidRootPart.Transparency = originalHitboxes[t].T; char.HumanoidRootPart.CanCollide = originalHitboxes[t].C; originalHitboxes[t] = nil
 			end
-			continue
+			do end --[[continue]]
 		end
 
 		if highlights[t] and highlights[t].Parent == nil then cleanESP(t) end
@@ -1899,7 +1865,6 @@ Connections["Stepped"] = RunService.Stepped:Connect(function()
 	end
 end)
 
--- ================= CS2-STYLE BHOP ENGINE =================
 local bhopState = {
 	lastGroundTick = 0,
 	airStrafeSpeed = 0,
@@ -1911,7 +1876,6 @@ local bhopState = {
 	peakSpeed = 0
 }
 
--- Strafe acceleration like CS2: turning + A/D gives speed boost in air
 Connections["BHopStrafe"] = RunService.RenderStepped:Connect(function(dt)
 	if not Config.BHop then return end
 	local char = player.Character
@@ -1925,12 +1889,10 @@ Connections["BHopStrafe"] = RunService.RenderStepped:Connect(function(dt)
 	
 	if isGrounded then
 		bhopState.lastGroundTick = tick()
-		-- Auto-jump if holding space and on ground
 		if bhopState.isHoldingJump and (tick() - bhopState.lastJumpTick) > 0.05 then
 			hum:ChangeState(Enum.HumanoidStateType.Jumping)
 			bhopState.lastJumpTick = tick()
 			bhopState.consecutiveHops = bhopState.consecutiveHops + 1
-			-- Preserve horizontal momentum on landing (don't kill speed)
 			local vel = root.Velocity
 			local hSpeed = Vector3.new(vel.X, 0, vel.Z).Magnitude
 			if hSpeed > 16 then
@@ -1940,8 +1902,6 @@ Connections["BHopStrafe"] = RunService.RenderStepped:Connect(function(dt)
 			end
 		end
 	else
-		-- Air strafe physics (CS2 style)
-		-- A/D keys + mouse movement = air acceleration
 		local strafeForce = Config.BHopStrafeForce or 0.12
 		local isStrafingLeft = UserInputService:IsKeyDown(Enum.KeyCode.A)
 		local isStrafingRight = UserInputService:IsKeyDown(Enum.KeyCode.D)
@@ -1952,7 +1912,6 @@ Connections["BHopStrafe"] = RunService.RenderStepped:Connect(function(dt)
 			local camLook = cam.CFrame.LookVector
 			local camRight = cam.CFrame.RightVector
 			
-			-- Strafe direction relative to camera
 			if isStrafingLeft then
 				strafeVec = strafeVec - Vector3.new(camRight.X, 0, camRight.Z).Unit
 			end
@@ -1965,12 +1924,10 @@ Connections["BHopStrafe"] = RunService.RenderStepped:Connect(function(dt)
 			
 			if strafeVec.Magnitude > 0 then
 				strafeVec = strafeVec.Unit
-				-- Only add speed if velocity is not already aligned
 				local currentVel = Vector3.new(root.Velocity.X, 0, root.Velocity.Z)
 				local currentSpeed = currentVel.Magnitude
 				local maxSpeed = 16 * (Config.BHopSpeed or 1.4) * 1.8
 				
-				-- Air strafe acceleration: project wishdir onto velocity, add if under cap
 				local dot = currentVel.Unit:Dot(strafeVec)
 				local addSpeed = strafeForce * 60 * dt
 				if currentSpeed < maxSpeed then
@@ -1982,7 +1939,6 @@ Connections["BHopStrafe"] = RunService.RenderStepped:Connect(function(dt)
 					)
 				end
 				
-				-- Track peak speed for notification
 				if currentSpeed > bhopState.peakSpeed then
 					bhopState.peakSpeed = currentSpeed
 				end
@@ -1991,7 +1947,6 @@ Connections["BHopStrafe"] = RunService.RenderStepped:Connect(function(dt)
 	end
 end)
 
--- Track jump key hold state for BHop
 Connections["BHopJumpTrack"] = UserInputService.InputBegan:Connect(function(input, gpe)
 	if gpe then return end
 	if input.KeyCode == Enum.KeyCode.Space then
@@ -2010,7 +1965,6 @@ Connections["JumpRequest"] = UserInputService.JumpRequest:Connect(function()
 	if player.Character and player.Character:FindFirstChild("Humanoid") then
 		local hum = player.Character.Humanoid
 		if Config.InfJump then hum:ChangeState(Enum.HumanoidStateType.Jumping) end
-		-- BHop handled by BHopStrafe connection above (ground-only, no InfJump behavior)
 		
 		if Config.SafeHighJump and hum.FloorMaterial ~= Enum.Material.Air then
 			hum:SetStateEnabled(Enum.HumanoidStateType.Jumping, false)
@@ -2044,7 +1998,6 @@ Connections["JumpRequest"] = UserInputService.JumpRequest:Connect(function()
 	end
 end)
 
--- ================= ИНПУТ МЕНЕДЖЕР =================
 Connections["InputBegan"] = UserInputService.InputBegan:Connect(function(input, proc)
 	if proc then return end
 	if input.KeyCode == Enum.KeyCode.RightShift or input.KeyCode == Enum.KeyCode.Insert then
@@ -2101,7 +2054,6 @@ Connections["InputBegan"] = UserInputService.InputBegan:Connect(function(input, 
 end)
 Connections["InputEnded"] = UserInputService.InputEnded:Connect(function(input, proc) if Binds.Aim ~= nil and (input.UserInputType == Binds.Aim or input.KeyCode == Binds.Aim) then Aiming = false end end)
 
--- ================= СИСТЕМА КОНФИГОВ (CFG) =================
 local function SaveConfig(name)
 	pcall(function()
 		if not isfolder("RichPremium") then makefolder("RichPremium") end
@@ -2148,7 +2100,6 @@ local function LoadConfig(name)
 	end)
 end
 
--- ================= ПОСТРОЕНИЕ ВКЛАДОК =================
 local Builders = {}
 
 Builders.Combat = function(parent)
@@ -2274,7 +2225,6 @@ Builders.WorldMisc = function(parent)
 	addToggle(parent, "Auto-Toxic", "AutoToxic")
 end
 
--- ================= WANTED GAME ENGINE & PLACE HUB =================
 do
 	local wantedStatus = "Idle"
 	local wantedStatusLabels = {}
@@ -2337,7 +2287,6 @@ local function getObjectInfoString(target)
 	end
 	local promptStr = #prompts > 0 and table.concat(prompts, " | ") or "None"
 
-	-- Children inside target
 	local childList = {}
 	for _, ch in ipairs(target:GetChildren()) do
 		if #childList < 8 then
@@ -2346,7 +2295,6 @@ local function getObjectInfoString(target)
 	end
 	local childStr = #childList > 0 and table.concat(childList, ", ") or "None"
 
-	-- Parent Sibling Summary (e.g. Gizmos)
 	local sibStr = "None"
 	if target.Parent and target.Parent ~= Workspace then
 		local counts = {}
@@ -2360,7 +2308,6 @@ local function getObjectInfoString(target)
 		sibStr = target.Parent.Name .. " -> " .. table.concat(parts, ", ")
 	end
 
-	-- Attributes / Values
 	local attrList = {}
 	pcall(function()
 		for k, v in pairs(target:GetAttributes()) do
@@ -2374,7 +2321,6 @@ local function getObjectInfoString(target)
 	end)
 	local attrStr = #attrList > 0 and table.concat(attrList, ", ") or "None"
 
-	-- Related Remotes in ReplicatedStorage
 	local remotes = {}
 	pcall(function()
 		local rs = game:GetService("ReplicatedStorage")
@@ -2389,7 +2335,6 @@ local function getObjectInfoString(target)
 	end)
 	local remStr = #remotes > 0 and table.concat(remotes, ", ") or "None"
 
-	-- Coordinates of all identical objects
 	local sameLines = {}
 	for idx, item in ipairs(WantedDebug.SameObjects or {}) do
 		if idx <= 15 then
@@ -2407,7 +2352,6 @@ local function getObjectInfoString(target)
 		target.Name, target.ClassName, target:GetFullName(), target.Parent and target.Parent.Name or "None", pos.X, pos.Y, pos.Z, dist, promptStr, childStr, attrStr, sibStr, remStr, #(WantedDebug.SameObjects or {}), sameStr)
 end
 
--- Forward declaration for crackTargetATM, flyTarget, isATMBroken, resetBrokenATMs, and getATMFrontCFrame
 local crackTargetATM = nil
 local flyTarget = nil
 local isATMBroken = nil
@@ -2471,7 +2415,6 @@ local function buildInspectorCard()
 	hTitle.TextXAlignment = Enum.TextXAlignment.Left
 	hTitle.ZIndex = 162
 
-	-- Dragging header logic (does not block buttons)
 	local dragging, dragInput, dragStart, startPos = false, nil, nil, nil
 	header.InputBegan:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -2537,7 +2480,6 @@ local function buildInspectorCard()
 	infoBox.ZIndex = 162
 	WantedDebug.CardLabels.Info = infoBox
 
-	-- Bottom Row 1: Copy Info & Fly Here
 	local copyBtn = Instance.new("TextButton", card)
 	copyBtn.Size = UDim2.new(0.48, -2, 0, 28)
 	copyBtn.Position = UDim2.new(0, 8, 1, -66)
@@ -2589,7 +2531,6 @@ local function buildInspectorCard()
 		end
 	end)
 
-	-- Bottom Row 2: Crack / Use & Fly to Next
 	local crackBtn = Instance.new("TextButton", card)
 	crackBtn.Size = UDim2.new(0.48, -2, 0, 28)
 	crackBtn.Position = UDim2.new(0, 8, 1, -34)
@@ -2648,7 +2589,6 @@ local function inspectObject(target)
 	if not target then return end
 	WantedDebug.LastTarget = target
 
-	-- Scan all identical objects across map
 	local sameObjects = {}
 	local targetName = target.Name
 	local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
@@ -2669,7 +2609,6 @@ local function inspectObject(target)
 	WantedDebug.SameObjects = sameObjects
 	WantedDebug.SameIndex = 1
 
-	-- Highlight all matching objects in 3D
 	highlightSameObjects()
 
 	local infoStr = getObjectInfoString(target)
@@ -2721,7 +2660,6 @@ UserInputService.InputBegan:Connect(function(input, gpe)
 	end
 end)
 
--- Helper to interact with ProximityPrompt or Virtual Key E
 local function interactPrompt(prompt, count)
 	if not prompt then return end
 	count = count or 1
@@ -2740,7 +2678,6 @@ local function interactPrompt(prompt, count)
 	end
 end
 
--- Helper to trigger 'E' keypress with guaranteed multi-engine delivery (VirtualInputManager + VirtualUser + keyclick + keypress)
 local function triggerEKey(count, interval)
 	count = count or 1
 	interval = interval or 0.28
@@ -2750,7 +2687,6 @@ local function triggerEKey(count, interval)
 	pcall(function() vu = game:GetService("VirtualUser") end)
 
 	for i = 1, count do
-		-- Key Down (without gameProcessed flag so gpe is false)
 		pcall(function()
 			if vim then
 				vim:SendKeyEvent(true, Enum.KeyCode.E, false, nil)
@@ -2780,7 +2716,6 @@ local function triggerEKey(count, interval)
 
 		task.wait(0.08)
 
-		-- Key Up
 		pcall(function()
 			if vim then
 				vim:SendKeyEvent(false, Enum.KeyCode.E, false, nil)
@@ -2806,7 +2741,6 @@ local function triggerEKey(count, interval)
 end
 
 
--- Helper: Get or Enter Vehicle Seat
 local function getOrEnterVehicle()
 	local char = player.Character
 	if not char then return nil, nil end
@@ -2814,7 +2748,6 @@ local function getOrEnterVehicle()
 	local hrp = char:FindFirstChild("HumanoidRootPart")
 	if not hum or not hrp then return nil, nil end
 
-	-- Check if already seated in a vehicle
 	if hum.SeatPart and (hum.SeatPart:IsA("VehicleSeat") or hum.SeatPart:IsA("Seat")) then
 		local seat = hum.SeatPart
 		local root = seat.AssemblyRootPart or seat.Parent.PrimaryPart or seat
@@ -2822,7 +2755,6 @@ local function getOrEnterVehicle()
 		return seat, root
 	end
 
-	-- Scan Workspace for vehicles
 	setWantedStatus("Finding Nearest Vehicle...")
 	local bestSeat, bestDist = nil, math.huge
 	for _, desc in pairs(Workspace:GetDescendants()) do
@@ -2835,7 +2767,6 @@ local function getOrEnterVehicle()
 		end
 	end
 
-	-- If no vehicle nearby, try spawning vehicle via Remotes
 	if not bestSeat then
 		setWantedStatus("Spawning Vehicle via Remote...")
 		pcall(function()
@@ -2851,7 +2782,6 @@ local function getOrEnterVehicle()
 			end
 		end)
 
-		-- Re-scan
 		for _, desc in pairs(Workspace:GetDescendants()) do
 			if (desc:IsA("VehicleSeat") or (desc:IsA("Seat") and desc.Name:lower():find("drive"))) and not desc.Occupant then
 				local d = (desc.Position - hrp.Position).Magnitude
@@ -2879,7 +2809,6 @@ local function getOrEnterVehicle()
 	return nil, nil
 end
 
--- Helper: Fly Vehicle smoothly to Target Position through high-altitude waypoints
 flyVehicleTo = function(targetPos, speed)
 	local seat, root = getOrEnterVehicle()
 	if not seat or not root then
@@ -2941,7 +2870,6 @@ flyVehicleTo = function(targetPos, speed)
 	return true
 end
 
--- Helper: Smooth fast character flight directly to target without needing a vehicle (Anti-Flag / Camera Fly Architecture)
 local function flyCharacterTo(targetPos, speed, shouldCancel)
 	local char = player.Character
 	local hrp = char and char:FindFirstChild("HumanoidRootPart")
@@ -2961,7 +2889,6 @@ local function flyCharacterTo(targetPos, speed, shouldCancel)
 		return true
 	end
 
-	-- 1. Enable PlatformStand & NoClip so character does not trip or get rubberbanded by floor physics
 	pcall(function()
 		hum.PlatformStand = true
 		hum:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false)
@@ -2971,17 +2898,14 @@ local function flyCharacterTo(targetPos, speed, shouldCancel)
 		end
 	end)
 
-	-- 2. Build anti-flagging Waypoints
 	local waypoints = {}
 	if dist > 35 then
-		-- Long flight: ascend to cruise height above buildings/mountains to prevent wall collision flags
 		local flyHeight = math.clamp(Config.Wanted_FlyHeight or 45, 18, 75)
 		local cruiseY = math.max(curPos.Y, targetPos.Y) + flyHeight
 		table.insert(waypoints, Vector3.new(curPos.X, cruiseY, curPos.Z))
 		table.insert(waypoints, Vector3.new(targetPos.X, cruiseY, targetPos.Z))
 		table.insert(waypoints, targetPos)
 	else
-		-- Short flight (e.g. inside bank between ATMs): fly direct
 		table.insert(waypoints, targetPos)
 	end
 
@@ -3006,7 +2930,6 @@ local function flyCharacterTo(targetPos, speed, shouldCancel)
 			local lookDir = Vector3.new(dir.X, 0, dir.Z)
 
 			pcall(function()
-				-- Synchronize physical velocity so server replication accepts movement without snapping back
 				hrp.AssemblyLinearVelocity = dir * speed
 				hrp.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
 				if lookDir.Magnitude > 0.1 then
@@ -3019,7 +2942,6 @@ local function flyCharacterTo(targetPos, speed, shouldCancel)
 		if not arrived then break end
 	end
 
-	-- 3. Restore character to grounded standing state
 	pcall(function()
 		hrp.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
 		hrp.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
@@ -3034,7 +2956,6 @@ local function flyCharacterTo(targetPos, speed, shouldCancel)
 	return arrived
 end
 
--- Universal Flight: if seated in a vehicle, fly the vehicle; otherwise fly character directly!
 flyTarget = function(targetPos, speed, shouldCancel)
 	local char = player.Character
 	local hum = char and char:FindFirstChildOfClass("Humanoid")
@@ -3045,7 +2966,6 @@ flyTarget = function(targetPos, speed, shouldCancel)
 	end
 end
 
--- Broken ATM Memory & Tracker
 local brokenATMs = {}
 
 isATMBroken = function(atmModel, part)
@@ -3057,11 +2977,9 @@ isATMBroken = function(atmModel, part)
 	if (tick() - lastRobbed) < cd then
 		return true, math.ceil(cd - (tick() - lastRobbed))
 	end
-	-- Check game attributes
 	if atmModel:GetAttribute("broken") == true or atmModel:GetAttribute("robbed") == true or atmModel:GetAttribute("empty") == true then
 		return true, 60
 	end
-	-- Check AlarmLight state (if AlarmLight is red or neon or enabled)
 	local alarm = atmModel:FindFirstChild("AlarmLight")
 	if alarm and alarm:IsA("BasePart") then
 		if alarm.Material == Enum.Material.Neon or (alarm.Color.R > 0.8 and alarm.Color.G < 0.3) then
@@ -3088,7 +3006,6 @@ resetBrokenATMs = function()
 	setWantedStatus("ATM cooldown memory cleared!")
 end
 
--- Helper to calculate the exact position and orientation right in front of the ATM
 getATMFrontCFrame = function(atmModel, atmPart)
 	local targetPart = atmModel:FindFirstChild("Slot") or atmModel:FindFirstChild("ATMDoor") or atmPart
 	local basePos = targetPart.Position
@@ -3125,16 +3042,13 @@ getATMFrontCFrame = function(atmModel, atmPart)
 		forwardDir = bestDir
 	end
 
-	-- Check that forwardDir doesn't collide with a wall within 1.6 studs
 	local wallHit = Workspace:Raycast(basePos, forwardDir * 2.5, rayParams)
 	if wallHit and (wallHit.Position - basePos).Magnitude < 1.7 then
 		forwardDir = -forwardDir
 	end
 
-	-- Stand distance 1.8 studs directly in front of ATM
 	local standPos = basePos + forwardDir * 1.8
 
-	-- Keep character height grounded
 	local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
 	local standY = hrp and hrp.Position.Y or basePos.Y
 	local floorHit = Workspace:Raycast(Vector3.new(standPos.X, basePos.Y + 3, standPos.Z), Vector3.new(0, -12, 0), rayParams)
@@ -3147,7 +3061,6 @@ getATMFrontCFrame = function(atmModel, atmPart)
 	return CFrame.new(standPos, lookAtTarget), standPos
 end
 
--- Comprehensive ATM Cracking Logic (Exact 4 E Hits + Cash Pickup + Broken Memory)
 crackTargetATM = function(atm)
 	if not atm or not atm.Part then return end
 	local char = player.Character
@@ -3155,14 +3068,12 @@ crackTargetATM = function(atm)
 	local hum = char and char:FindFirstChildOfClass("Humanoid")
 	if not hrp or not hum then return end
 
-	-- 1. Ensure character is standing upright on foot
 	pcall(function()
 		hum.Sit = false
 		hum.PlatformStand = false
 		hum:ChangeState(Enum.HumanoidStateType.GettingUp)
 	end)
 
-	-- 2. Stand directly in front of the ATM facing keypad/slot
 	local standCFrame, standPos = getATMFrontCFrame(atm.Model, atm.Part)
 	pcall(function()
 		hrp.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
@@ -3171,7 +3082,6 @@ crackTargetATM = function(atm)
 	end)
 	task.wait(0.12)
 
-	-- 3. Execute exactly 4 E hits (user specified: 4 раза)
 	local totalHits = Config.Wanted_ATMHits or 4
 	for hit = 1, totalHits do
 		if not (Config.Wanted_AutoATM or WantedDebug.TestingFly) then break end
@@ -3182,7 +3092,6 @@ crackTargetATM = function(atm)
 		end)
 		setWantedStatus(string.format("Cracking %s (Hit %d/%d)...", atm.Model.Name, hit, totalHits))
 
-		-- Equip & activate melee tool if present
 		pcall(function()
 			local tool = char:FindFirstChildOfClass("Tool")
 			if not tool then
@@ -3193,7 +3102,6 @@ crackTargetATM = function(atm)
 			if tool then tool:Activate() end
 		end)
 
-		-- Trigger ProximityPrompts, ClickDetectors, and SurfaceGui buttons
 		pcall(function()
 			for _, desc in ipairs(atm.Model:GetDescendants()) do
 				if desc:IsA("ProximityPrompt") then
@@ -3211,7 +3119,6 @@ crackTargetATM = function(atm)
 			end
 		end)
 
-		-- Trigger any onscreen interact buttons in PlayerGui
 		pcall(function()
 			local pg = player:FindFirstChild("PlayerGui")
 			if pg then
@@ -3230,12 +3137,10 @@ crackTargetATM = function(atm)
 			end
 		end)
 
-		-- Dispatch multi-engine E key (VirtualInputManager without GPE, VirtualUser "e", keyclick, keypress)
 		triggerEKey(1, 0.01)
 		task.wait(0.30)
 	end
 
-	-- 4. Collect any dropped cash around ATM
 	setWantedStatus("ATM Cracked! Collecting Cash Drops...")
 	task.wait(Config.Wanted_ATMDelay or 0.6)
 	pcall(function()
@@ -3255,7 +3160,6 @@ crackTargetATM = function(atm)
 		end
 	end)
 
-	-- 5. Mark this ATM as broken
 	markATMBroken(atm.Model, atm.Part)
 	setWantedStatus("Cracked " .. atm.Model.Name .. " (Marked Broken in memory)!")
 end
@@ -3282,12 +3186,10 @@ local function crackNearestATM()
 	crackTargetATM(bestAtm)
 end
 
--- Helper: Get Gizmos folder if it exists
 local function getGizmosFolder()
 	return (Workspace:FindFirstChild("Local") and Workspace.Local:FindFirstChild("Gizmos")) or Workspace:FindFirstChild("Gizmos")
 end
 
--- Scan Bank Vault Gold Bars, Silver Bars, Cash Pallets, and World Safes
 local function findBankGoldBars()
 	local bars = {}
 	local seen = {}
@@ -3311,7 +3213,7 @@ local function findBankGoldBars()
 		for _, obj in pairs(Workspace:GetDescendants()) do
 			if obj:IsA("BasePart") or obj:IsA("Model") then
 				local n = obj.Name:lower()
-				if n:find("atmosphere") or n:find("platform") or n:find("terrain") then continue end
+				local skipNode = (n:find("atmosphere") or n:find("platform") or n:find("terrain")) ~= nil
 				if (n:find("gold") or n:find("ingot") or n:find("bar") or n:find("vaultcash") or n:find("cashpile") or n:find("moneybag")) and not obj:FindFirstAncestorOfClass("Tool") and not obj:FindFirstAncestorOfClass("Player") then
 					local part = obj:IsA("BasePart") and obj or obj:FindFirstChildWhichIsA("BasePart")
 					if part and not seen[obj] and part.Transparency < 1 and math.abs(part.Position.Y) < 1500 then
@@ -3331,7 +3233,6 @@ local function findBankGoldBars()
 	return bars
 end
 
--- Find Gold Dealer / Buyer
 local function findGoldDealer()
 	local gizmos = getGizmosFolder()
 	if gizmos then
@@ -3360,12 +3261,10 @@ local function findGoldDealer()
 	return nil
 end
 
--- Scan all ATMs in map (with includeBroken filter)
 local function findATMs(includeBroken)
 	local atms = {}
 	local seen = {}
 
-	-- Priority 1: Check Workspace.Local.Gizmos and any Gizmos folder
 	local gizmosFolders = {}
 	if Workspace:FindFirstChild("Local") and Workspace.Local:FindFirstChild("Gizmos") then
 		table.insert(gizmosFolders, Workspace.Local.Gizmos)
@@ -3392,11 +3291,10 @@ local function findATMs(includeBroken)
 		end
 	end
 
-	-- Priority 2: Scan all other ATMs across Workspace (other towns/locations)
 	for _, obj in pairs(Workspace:GetDescendants()) do
 		local n = obj.Name:lower()
 		if n:find("atmosphere") or n:find("platform") or n:find("water") or n:find("batman") or n:find("treatment") or n:find("terrain") or n:find("camera") then
-			continue
+			do end --[[continue]]
 		end
 
 		local isATM = false
@@ -3428,7 +3326,6 @@ local function findATMs(includeBroken)
 	return atms
 end
 
--- Background Task: Wanted Bank Auto-Farm Loop
 local bankFarmThread = nil
 local function startWantedBankLoop()
 	if bankFarmThread then return end
@@ -3437,7 +3334,6 @@ local function startWantedBankLoop()
 			local char = player.Character
 			local hrp = char and char:FindFirstChild("HumanoidRootPart")
 
-			-- Step 1: Fly to Bank Vault
 			local lootItems = findBankGoldBars()
 			local targetPos = nil
 			if #lootItems > 0 then
@@ -3454,14 +3350,13 @@ local function startWantedBankLoop()
 			if not targetPos then
 				setWantedStatus("Bank Vault not found! Waiting...")
 				task.wait(3)
-				continue
+				do end --[[continue]]
 			end
 
 			setWantedStatus("Bank Farm: Flying to Bank Vault...")
 			local arrived = flyTarget(targetPos + Vector3.new(0, 2, 0), Config.Wanted_FlySpeed, function() return not Config.Wanted_AutoBank end)
 			if not arrived or not Config.Wanted_AutoBank then break end
 
-			-- Step 2: Collect Gold Bars & Vault Loot
 			setWantedStatus("Bank Farm: Collecting Vault Loot...")
 			lootItems = findBankGoldBars()
 			if #lootItems > 0 and hrp then
@@ -3486,7 +3381,6 @@ local function startWantedBankLoop()
 				task.wait(5)
 			end
 
-			-- Step 3: Fly to Dealer to Sell
 			if Config.Wanted_AutoSell and Config.Wanted_AutoBank then
 				setWantedStatus("Bank Farm: Locating Gold Dealer...")
 				local dealer = findGoldDealer()
@@ -3512,7 +3406,6 @@ local function startWantedBankLoop()
 	end)
 end
 
--- Background Task: Wanted ATM Robbery Loop
 local atmFarmThread = nil
 local function startWantedATMLoop()
 	if atmFarmThread then return end
@@ -3538,7 +3431,7 @@ local function startWantedATMLoop()
 					setWantedStatus("No ATMs found on map! Retrying in 3s...")
 				end
 				task.wait(3)
-				continue
+				do end --[[continue]]
 			end
 
 			local bestAtm, bestDist = nil, math.huge
@@ -3552,16 +3445,14 @@ local function startWantedATMLoop()
 
 			if not bestAtm then
 				task.wait(2)
-				continue
+				do end --[[continue]]
 			end
 
-			-- Fast Smooth Flight directly to front of target ATM
 			setWantedStatus("ATM Farm: Flying to ATM (" .. bestAtm.Model.Name .. ")...")
 			local standCFrame, targetPos = getATMFrontCFrame(bestAtm.Model, bestAtm.Part)
 			local arrived = flyTarget(targetPos, Config.Wanted_FlySpeed, function() return not Config.Wanted_AutoATM end)
 			if not arrived or not Config.Wanted_AutoATM then break end
 
-			-- Crack ATM (4 hits + collect cash + mark broken)
 			crackTargetATM(bestAtm)
 			task.wait(0.3)
 		end
@@ -3570,7 +3461,6 @@ local function startWantedATMLoop()
 	end)
 end
 
--- Manual Vehicle 3D Flight Controller (WASD + Space/Ctrl)
 Connections["Wanted_VehicleFly"] = RunService.Heartbeat:Connect(function(dt)
 	if Config.Wanted_VehicleFly and player.Character then
 		local hum = player.Character:FindFirstChildOfClass("Humanoid")
@@ -3603,7 +3493,6 @@ Builders.Games = function(parent)
 	local dropW = isDrop and (parent.AbsoluteSize.X > 50 and (parent.AbsoluteSize.X - 10) or 165) or nil
 	local btnW = isModern and 690 or (dropW or (parent == SettingsFrame and 450 or 180))
 
-	-- Game Selector Header Card
 	local gameCard = Instance.new("Frame", parent)
 	gameCard.Size = UDim2.new(0, btnW, 0, 52)
 	gameCard.BackgroundColor3 = Color3.fromRGB(18, 20, 28)
@@ -3644,7 +3533,6 @@ Builders.Games = function(parent)
 	gStatusBadge.TextSize = 10
 	rCorner(gStatusBadge, 11)
 
-	-- Status Monitor Label
 	local statLbl = Instance.new("TextLabel", parent)
 	statLbl.Size = UDim2.new(0, btnW, 0, 26)
 	statLbl.BackgroundColor3 = Color3.fromRGB(14, 14, 20)
@@ -3656,7 +3544,6 @@ Builders.Games = function(parent)
 	rCorner(statLbl, 6)
 	table.insert(wantedStatusLabels, statLbl)
 
-	-- Section 1: Bank Auto-Farm
 	local sep1 = Instance.new("Frame", parent); sep1.Size = UDim2.new(0, btnW, 0, 1); sep1.BackgroundColor3 = Color3.fromRGB(45, 45, 60); sep1.BorderSizePixel = 0
 	local tBank = Instance.new("TextLabel", parent); tBank.Size = UDim2.new(1,0,0,22); tBank.BackgroundTransparency = 1; tBank.Text = "🏦 BANK GOLD AUTO-FARM"; tBank.Font = Enum.Font.GothamBold; tBank.TextColor3 = Color3.fromRGB(240,240,255); tBank.TextSize = 12
 
@@ -3675,7 +3562,6 @@ Builders.Games = function(parent)
 		if d and flyTarget then flyTarget(d.Position + Vector3.new(0, 2, 0)) end
 	end)
 
-	-- Section 2: ATM Auto-Farm
 	local sep2 = Instance.new("Frame", parent); sep2.Size = UDim2.new(0, btnW, 0, 1); sep2.BackgroundColor3 = Color3.fromRGB(45, 45, 60); sep2.BorderSizePixel = 0
 	local tATM = Instance.new("TextLabel", parent); tATM.Size = UDim2.new(1,0,0,22); tATM.BackgroundTransparency = 1; tATM.Text = "🏧 ATM ROBBERY AUTO-FARM"; tATM.Font = Enum.Font.GothamBold; tATM.TextColor3 = Color3.fromRGB(240,240,255); tATM.TextSize = 12
 
@@ -3711,7 +3597,6 @@ Builders.Games = function(parent)
 		Config.Wanted_ATMDelay = tonumber(v) or 0.8
 	end)
 
-	-- Section 3: Vehicle Flight & Bypass
 	local sep3 = Instance.new("Frame", parent); sep3.Size = UDim2.new(0, btnW, 0, 1); sep3.BackgroundColor3 = Color3.fromRGB(45, 45, 60); sep3.BorderSizePixel = 0
 	local tVeh = Instance.new("TextLabel", parent); tVeh.Size = UDim2.new(1,0,0,22); tVeh.BackgroundTransparency = 1; tVeh.Text = "🚗 VEHICLE FLIGHT & BYPASS"; tVeh.Font = Enum.Font.GothamBold; tVeh.TextColor3 = Color3.fromRGB(240,240,255); tVeh.TextSize = 12
 
@@ -3726,7 +3611,6 @@ Builders.Games = function(parent)
 		Config.Wanted_FlyHeight = tonumber(v) or 55
 	end)
 
-	-- Section 4: Object Inspector & Debug
 	local sep4 = Instance.new("Frame", parent); sep4.Size = UDim2.new(0, btnW, 0, 1); sep4.BackgroundColor3 = Color3.fromRGB(45, 45, 60); sep4.BorderSizePixel = 0
 	local tDeb = Instance.new("TextLabel", parent); tDeb.Size = UDim2.new(1,0,0,22); tDeb.BackgroundTransparency = 1; tDeb.Text = "🔍 OBJECT INSPECTOR & DEBUG"; tDeb.Font = Enum.Font.GothamBold; tDeb.TextColor3 = Color3.fromRGB(0,220,255); tDeb.TextSize = 12
 
@@ -3919,14 +3803,12 @@ Builders.Configs = function(parent)
 end
 
 do
--- ================= MUSIC / AUTO PIANO =================
--- ВСТАВИТЬ СРАЗУ ПОСЛЕ блока Builders.WorldMisc (до "ИНИЦИАЛИЗАЦИЯ ВКЛАДОК MAIN MENU")
 
 Config.Music_Text = Config.Music_Text or ""
-Config.Music_Delay = Config.Music_Delay or 0.12      -- базовая пауза между нотами (сек)
-Config.Music_Speed = Config.Music_Speed or 1         -- множитель скорости (2 = в 2 раза быстрее)
-Config.Music_StartDelay = Config.Music_StartDelay or 3 -- сек до старта (успеть кликнуть на пианино)
-Config.Music_Hold = Config.Music_Hold or 0.04        -- сколько держится нажатие клавиши
+Config.Music_Delay = Config.Music_Delay or 0.12
+Config.Music_Speed = Config.Music_Speed or 1
+Config.Music_StartDelay = Config.Music_StartDelay or 3
+Config.Music_Hold = Config.Music_Hold or 0.04
 Config.Music_Loop = Config.Music_Loop or false
 
 local MusicState = { Playing = false, Paused = false, Token = 0, Status = "Idle", Labels = {} }
@@ -3938,7 +3820,6 @@ local DigitNames = {
 	["0"] = "Zero", ["1"] = "One", ["2"] = "Two", ["3"] = "Three", ["4"] = "Four",
 	["5"] = "Five", ["6"] = "Six", ["7"] = "Seven", ["8"] = "Eight", ["9"] = "Nine"
 }
--- символы, которые на пианино = Shift + цифра (диезы)
 local ShiftDigits = {
 	["!"] = "1", ["@"] = "2", ["#"] = "3", ["$"] = "4", ["%"] = "5",
 	["^"] = "6", ["&"] = "7", ["*"] = "8", ["("] = "9", [")"] = "0"
@@ -3961,7 +3842,6 @@ local function sendKey(code, down)
 	end)
 end
 
--- символ -> KeyCode, нужен ли Shift
 local function noteFromChar(ch)
 	local d = ShiftDigits[ch]
 	if d then return Enum.KeyCode[DigitNames[d]], true end
@@ -3972,7 +3852,6 @@ local function noteFromChar(ch)
 	return nil, false
 end
 
--- Парсер: буквы = ноты, [asdf] = аккорд, пробел/- = пауза, | и перенос строки = длинная пауза
 local function parseSong(text)
 	local tokens = {}
 	local i, n = 1, #text
@@ -4049,7 +3928,6 @@ local function startMusic()
 				while MusicState.Paused and token == MusicState.Token do task.wait(0.1) end
 				if token ~= MusicState.Token then return end
 
-				-- скорость читается каждый шаг, можно менять на лету
 				local unit = math.max(0.01, (Config.Music_Delay or 0.12) / math.max(0.05, Config.Music_Speed or 1))
 				if tk.t == "n" then
 					playNotes(tk.notes, math.min(Config.Music_Hold or 0.04, unit * 0.8))
@@ -4079,7 +3957,6 @@ Builders.Music = function(parent)
 	local dropW = isDrop and (parent.AbsoluteSize.X > 50 and (parent.AbsoluteSize.X - 10) or 165) or nil
 	local btnW = isModern and 690 or (dropW or (parent == SettingsFrame and 450 or 180))
 
-	-- Статус
 	local statLbl = Instance.new("TextLabel", parent)
 	statLbl.Size = UDim2.new(0, btnW, 0, 26)
 	statLbl.BackgroundColor3 = Color3.fromRGB(14, 14, 20)
@@ -4092,7 +3969,6 @@ Builders.Music = function(parent)
 	rCorner(statLbl, 6)
 	table.insert(MusicState.Labels, statLbl)
 
-	-- Многострочное поле для нот
 	local songBox = Instance.new("TextBox", parent)
 	songBox.Size = UDim2.new(0, btnW, 0, 130)
 	songBox.BackgroundColor3 = Color3.fromRGB(16, 16, 22)
@@ -4116,7 +3992,6 @@ Builders.Music = function(parent)
 	songBox.FocusLost:Connect(function() Config.Music_Text = songBox.Text end)
 	songBox:GetPropertyChangedSignal("Text"):Connect(function() Config.Music_Text = songBox.Text end)
 
-	-- Управление
 	createButton(parent, "▶ Start", btnW, function()
 		Config.Music_Text = songBox.Text
 		startMusic()
@@ -4129,7 +4004,6 @@ Builders.Music = function(parent)
 	end)
 	createButton(parent, "⏹ Stop", btnW, function() stopMusic() end)
 
-	-- Настройки
 	createTextBox(parent, "Speed (x)", tostring(Config.Music_Speed), function(v)
 		Config.Music_Speed = math.clamp(tonumber(v) or 1, 0.1, 10)
 	end)
@@ -4168,8 +4042,6 @@ end
 end
 
 do
--- ================= PAINT BOT / AUTO DRAW SYSTEM =================
--- Загрузка PNG/BMP/URL, квантование цветов, RLE-оптимизация штрихов и скоростное рисование на холсте
 
 local PaintState = {
 	Running = false,
@@ -4194,7 +4066,6 @@ local PaintState = {
 local VIM = nil
 pcall(function() VIM = game:GetService("VirtualInputManager") end)
 
--- UI Status updater across active frames
 local function setPaintStatus(text, progress)
 	PaintState.Status = text
 	if progress then PaintState.Progress = math.clamp(progress, 0, 1) end
@@ -4216,7 +4087,6 @@ local function setPaintStatus(text, progress)
 	end
 end
 
--- ================= ДЕТЕКТ И УПРАВЛЕНИЕ ХОЛСТОМ =================
 local function findCanvasPart()
 	if PaintState.SelectedCanvas and PaintState.SelectedCanvas.Parent then
 		return PaintState.SelectedCanvas
@@ -4225,7 +4095,6 @@ local function findCanvasPart()
 	local char = player.Character
 	local hrp = char and char:FindFirstChild("HumanoidRootPart")
 
-	-- 1. Луч вниз под ноги персонажа
 	if hrp then
 		local rayParams = RaycastParams.new()
 		rayParams.FilterDescendantsInstances = {char}
@@ -4240,7 +4109,6 @@ local function findCanvasPart()
 		end
 	end
 
-	-- 2. Поиск в Workspace по явным именам
 	for _, obj in pairs(Workspace:GetDescendants()) do
 		if obj:IsA("BasePart") then
 			local n = obj.Name:lower()
@@ -4251,7 +4119,6 @@ local function findCanvasPart()
 		end
 	end
 
-	-- 3. Поиск большой плоской детали пола рядом с игроком
 	if hrp then
 		local bestPart, bestDist = nil, math.huge
 		for _, obj in pairs(Workspace:GetDescendants()) do
@@ -4305,7 +4172,6 @@ local function getCanvasInfo(part)
 	local cf = part.CFrame
 	local sz = part.Size
 
-	-- Берём все 6 граней Part и выбираем САМУЮ БОЛЬШУЮ — это рабочая поверхность холста
 	local faces = {
 		{ n = cf.LookVector,   w = sz.X, h = sz.Y, t = sz.Z },
 		{ n = -cf.LookVector,  w = sz.X, h = sz.Y, t = sz.Z },
@@ -4321,7 +4187,6 @@ local function getCanvasInfo(part)
 	end
 
 	local normal = best.n
-	-- Предпочитаем, чтобы нормаль была обращена к игроку (для вертикальных холстов-стендов)
 	pcall(function()
 		local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
 		if hrp and (normal:Dot(hrp.Position - part.Position)) < 0 then
@@ -4329,8 +4194,6 @@ local function getCanvasInfo(part)
 		end
 	end)
 
-	-- Оси плоскости поверхности: rightV ~ горизонталь экрана, downV ~ вертикаль экрана вниз.
-	-- Оба вектора СТРОГО перпендикулярны normal (иначе точки схлопываются в линию).
 	local cam = Workspace.CurrentCamera
 	local camRight = (cam and cam.CFrame.RightVector) or Vector3.xAxis
 	local camDown = -(cam and cam.CFrame.UpVector or Vector3.yAxis)
@@ -4353,7 +4216,6 @@ local function getCanvasInfo(part)
 	if downV:Dot(camDown) < 0 then downV = -downV end
 	if rightV:Dot(projectToPlane(camRight) or rightV) < 0 then rightV = -rightV end
 
-	-- Размеры поверхности вдоль выбранных осей (проекция габаритов Part на ось)
 	local function axisExtent(axisVec)
 		return math.abs(sz.X * cf.RightVector:Dot(axisVec))
 			+ math.abs(sz.Y * cf.UpVector:Dot(axisVec))
@@ -4369,17 +4231,14 @@ local function getCanvasInfo(part)
 	local surfH = math.max(eD, 1)
 	local thickness = math.max(best.t, 0.05)
 
-	-- Возвращаем: surfW, surfH, normal, rightV, downV, thickness
 	return surfW, surfH, normal, rightV, downV, thickness
 end
 
--- ================= УПРАВЛЕНИЕ ИНСТРУМЕНТАМИ И ЦВЕТОМ =================
 local function equipBrushTool()
 	local char = player.Character
 	if not char then return nil end
 	local hum = char:FindFirstChild("Humanoid")
 
-	-- Проверка экипированного инструмента
 	for _, item in ipairs(char:GetChildren()) do
 		if item:IsA("Tool") then
 			local n = item.Name:lower()
@@ -4389,7 +4248,6 @@ local function equipBrushTool()
 		end
 	end
 
-	-- Поиск в Backpack
 	local bp = player:FindFirstChild("Backpack")
 	if bp and hum then
 		for _, item in ipairs(bp:GetChildren()) do
@@ -4421,7 +4279,6 @@ local function setInGameColor(c3)
 	local b = math.clamp(math.floor(c3.B * 255), 0, 255)
 	local hex = string.format("%02X%02X%02X", r, g, b)
 
-	-- 1. Запись в TextBox Hex кода в PlayerGui (как на скриншоте: "000000")
 	pcall(function()
 		local pg = player:FindFirstChild("PlayerGui")
 		if pg then
@@ -4437,7 +4294,6 @@ local function setInGameColor(c3)
 		end
 	end)
 
-	-- 2. Вызов RemoteEvent для цвета, если доступен
 	pcall(function()
 		local tool = equipBrushTool()
 		local checkRemotes = {}
@@ -4505,9 +4361,7 @@ local function clearInGameCanvas()
 	end
 end
 
--- ================= ДЕКОДЕРЫ ИЗОБРАЖЕНИЙ (PNG & BMP) =================
 
--- Встроенный чистый Lua-парсер BMP (24-bit и 32-bit, оффлайн без интернета)
 local function decodeBMP(raw)
 	if #raw < 54 then return nil, "Файл слишком мал для BMP" end
 	if raw:sub(1, 2) ~= "BM" then return nil, "Не является файлом BMP" end
@@ -4552,9 +4406,6 @@ local function decodeBMP(raw)
 	return img
 end
 
--- ================= ВСТРОЕННЫЙ ОФФЛАЙН PNG ДЕКОДЕР =================
--- Чистый Luau/Lua декомпрессор Deflate (RFC 1951) + PNG парсер (IHDR, PLTE, tRNS, IDAT)
--- Работает 100% оффлайн на любом экзекуторе (включая Xeno) без интернета и без game:HttpGet.
 
 local function decodePNG(data)
 	if not data or #data < 8 then return nil, "Файл слишком мал для PNG" end
@@ -4563,7 +4414,6 @@ if not (b1 == 137 and b2 == 80 and b3 == 78 and b4 == 71 and b5 == 13 and b6 == 
 return nil, string.format("Не PNG (сигнатура: %d %d %d %d %d %d %d %d)", b1 or 0, b2 or 0, b3 or 0, b4 or 0, b5 or 0, b6 or 0, b7 or 0, b8 or 0)
 end
 
-	-- Битовые операции с защитой
 	local _b = bit32 or bit or {}
 	local band = _b.band or function(a, b)
 		local res, p = 0, 1
@@ -4595,7 +4445,6 @@ end
 		return b1 * 16777216 + b2 * 65536 + b3 * 256 + b4
 	end
 
-	-- 1. Разбор чанков PNG
 	local pos = 9
 	local dataLen = #data
 	local ihdr = nil
@@ -4615,7 +4464,7 @@ end
 			chunkData = data:sub(pos, endPos)
 			pos = pos + chunkLen
 		end
-		pos = pos + 4 -- пропускаем 4 байта CRC
+		pos = pos + 4
 
 		if chunkType == "IHDR" and #chunkData >= 13 then
 			ihdr = {
@@ -4643,7 +4492,6 @@ end
 
 	local compressed = table.concat(idatChunks)
 
-	-- 2. Декомпрессия Deflate (RFC 1951)
 	local function makeBitReader(str, startByte)
 		local bytePos = startByte or 1
 		local bitBuf = 0
@@ -4781,7 +4629,6 @@ end
 	local fixedDistTree = buildHuffmanTree(fixedDistLengths, 31)
 
 	local function inflateZlib(zData)
-		-- Нативный декомпрессор экзекутора при наличии
 		local okNative, resNative = pcall(function()
 			if syn and syn.crypt and syn.crypt.custom and syn.crypt.custom.inflate then
 				return syn.crypt.custom.inflate(zData)
@@ -4912,7 +4759,6 @@ end
 		return nil, "Ошибка декомпрессии PNG (Deflate): " .. tostring(inflateErr)
 	end
 
-	-- 3. Восстановление сканлайнов (Unfiltering)
 	local width = ihdr.width
 	local height = ihdr.height
 	local colorType = ihdr.colorType
@@ -4966,7 +4812,6 @@ end
 		prevRow = currRow
 	end
 
-	-- 4. Экземпляр изображения с методом GetPixel (1-based координаты)
 	local img = {
 		Width = width,
 		Height = height,
@@ -4976,18 +4821,18 @@ end
 			local row = rows[y]
 			if not row then return Color3.new(0, 0, 0), 0 end
 
-			if colorType == 2 then -- RGB
+			if colorType == 2 then
 				if bitDepth == 8 then
 					local idx = (x - 1) * 3 + 1
 					local r = row[idx] or 0
 					local g = row[idx + 1] or 0
 					local b = row[idx + 2] or 0
 					return Color3.fromRGB(r, g, b), 1
-				else -- 16-bit
+				else
 					local idx = (x - 1) * 6 + 1
 					return Color3.fromRGB(row[idx] or 0, row[idx + 2] or 0, row[idx + 4] or 0), 1
 				end
-			elseif colorType == 6 then -- RGBA
+			elseif colorType == 6 then
 				if bitDepth == 8 then
 					local idx = (x - 1) * 4 + 1
 					local r = row[idx] or 0
@@ -4995,12 +4840,12 @@ end
 					local b = row[idx + 2] or 0
 					local a = (row[idx + 3] or 255) / 255
 					return Color3.fromRGB(r, g, b), a
-				else -- 16-bit
+				else
 					local idx = (x - 1) * 8 + 1
 					local a = (row[idx + 6] or 255) / 255
 					return Color3.fromRGB(row[idx] or 0, row[idx + 2] or 0, row[idx + 4] or 0), a
 				end
-			elseif colorType == 3 then -- Indexed (PLTE)
+			elseif colorType == 3 then
 				local palIdx = 0
 				if bitDepth == 8 then
 					palIdx = row[x] or 0
@@ -5029,10 +4874,10 @@ end
 					a = (string.byte(trns, palIdx + 1) or 255) / 255
 				end
 				return Color3.fromRGB(r, g, b), a
-			elseif colorType == 0 then -- Grayscale
+			elseif colorType == 0 then
 				local v = row[x] or 0
 				return Color3.fromRGB(v, v, v), 1
-			elseif colorType == 4 then -- Grayscale + Alpha
+			elseif colorType == 4 then
 				local idx = (x - 1) * 2 + 1
 				local v = row[idx] or 0
 				local a = (row[idx + 1] or 255) / 255
@@ -5051,12 +4896,10 @@ local function decodeImage(data, filename)
 		return nil, "Файл пуст (0 байт)"
 	end
 
-	-- 1. Проверка на BMP
 	if data:sub(1, 2) == "BM" then
 		return decodeBMP(data)
 	end
 
-	-- 2. Встроенный 100% оффлайн PNG декодер
 	local ok, imgOrErr = pcall(function()
 		return decodePNG(data)
 	end)
@@ -5064,7 +4907,6 @@ local function decodeImage(data, filename)
 		return imgOrErr
 	end
 
-	-- 3. Резерв: внешняя библиотека (если была подключена ранее)
 	if _G.RichPNGDecoder and _G.RichPNGDecoder.new then
 		local ok2, img2 = pcall(function()
 			return _G.RichPNGDecoder.new(data)
@@ -5079,13 +4921,11 @@ local function decodeImage(data, filename)
 return nil, "Ошибка декодирования PNG: " .. errReason .. ". Вы также можете сохранить картинку как 24-bit .BMP в Paint (BMP поддерживается 100% оффлайн)."
 end
 
--- Загрузка файла с диска или по URL
 local function fetchImageData(pathOrUrl)
 	if not pathOrUrl or type(pathOrUrl) ~= "string" then return nil, "Путь не указан" end
 	local rawInput = pathOrUrl:gsub('^%s+', ''):gsub('%s+$', ''):gsub('^["\']', ''):gsub('["\']$', '')
 	if rawInput == "" then return nil, "Путь не указан" end
 
-	-- 1. Если это URL
 	if rawInput:find("^https?://") then
 		local ok, body = pcall(function()
 			if game and game.HttpGet then return game:HttpGet(rawInput) end
@@ -5104,7 +4944,6 @@ local function fetchImageData(pathOrUrl)
 		return nil, "Ошибка скачивания по URL. Проверьте ссылку."
 	end
 
-	-- 2. Нормализация Windows-путей в относительные пути Executor Workspace
 	local norm = rawInput:gsub("\\", "/")
 	local afterWorkspace = norm:match("[Ww][Oo][Rr][Kk][Ss][Pp][Aa][Cc][Ee]/(.+)$")
 	local afterRich = norm:match("[Rr][Ii][Cc][Hh][Pp][Rr][Ee][Mm][Ii][Uu][Mm]/(.+)$")
@@ -5118,7 +4957,6 @@ local function fetchImageData(pathOrUrl)
 		end
 	end
 
-	-- Авто-распознавание полного пути Windows из Xeno:
 	if afterWorkspace then
 		addCand(afterWorkspace)
 	end
@@ -5148,7 +4986,6 @@ local function fetchImageData(pathOrUrl)
 	return nil, string.format("Файл не найден. В Xeno путь считается от папки workspace. Попробуйте указать: 'RichPremium/%s' или '%s'.", justFilename, justFilename)
 end
 
--- ================= КВАНТОВАНИЕ ЦВЕТОВ И RLE ОПТИМИЗАЦИЯ =================
 local function colorDistSq(c1, c2)
 	local dr = c1.R - c2.R
 	local dg = c1.G - c2.G
@@ -5199,7 +5036,6 @@ local function extractPalette(pixelGrid, targetW, targetH, maxColors)
 		end
 	end
 
-	-- Сортировка: темные цвета рисуются первыми (четкий контур)
 	table.sort(palette, function(a, b)
 		local lumA = a.R * 0.299 + a.G * 0.587 + a.B * 0.114
 		local lumB = b.R * 0.299 + b.G * 0.587 + b.B * 0.114
@@ -5225,17 +5061,13 @@ end
 local function prepareDrawBatches(img, targetW, targetH, paletteSize, skipWhite)
 	local origW = img.Width
 	local origH = img.Height
-
-	-- Box-filter усреднение с УЧЁТОМ ПРОПОРЦИЙ картинки и сетки.
-		-- Раньше при расхождении аспектов шаг выборки становился < 1 пикселя — строки сетки
-			брали одни и те же пиксели, и вместо фото рисовались горизонтальные полоски.
 	local imgAspect = origW / math.max(1, origH)
 	local gridAspect = targetW / math.max(1, targetH)
 	local effTW, effTH = targetW, targetH
 	if gridAspect > imgAspect then
-		effTH = math.max(2, math.round(targetW / imgAspect)) -- сетка шире картинки -> выше
+		effTH = math.max(2, math.round(targetW / imgAspect))
 	else
-		effTW = math.max(2, math.round(targetH * imgAspect)) -- сетка уже картинки -> шире
+		effTW = math.max(2, math.round(targetH * imgAspect))
 	end
 	local padX = (effTW - targetW) / 2
 	local padY = (effTH - targetH) / 2
@@ -5285,7 +5117,6 @@ local function prepareDrawBatches(img, targetW, targetH, paletteSize, skipWhite)
 
 	local totalSegments = 0
 
-	-- RLE объединение соседних горизонтальных точек одного цвета в непрерывный штрих
 	for y = 1, targetH do
 		local curColorIdx = nil
 		local startX = nil
@@ -5322,7 +5153,6 @@ local function prepareDrawBatches(img, targetW, targetH, paletteSize, skipWhite)
 	return colorBuckets, palette, totalSegments, targetW, targetH
 end
 
--- ================= ИСПОЛНИТЕЛЬНЫЙ ДВИЖОК РИСОВАНИЯ =================
 local function stopPainting()
 	PaintState.Token = PaintState.Token + 1
 	PaintState.Running = false
@@ -5371,7 +5201,6 @@ local function executePainting()
 	local paletteSize = math.clamp(tonumber(Config.Paint_PaletteSize) or 24, 6, 64)
 	local skipWhite = (Config.Paint_SkipWhite ~= false)
 	local delayTime = math.max(0.003, tonumber(Config.Paint_Delay) or 0.015)
-	-- Масштаб рисунка относительно холста (можно уменьшить, чтобы не рисовать на весь холст)
 	local imgScale = math.clamp(tonumber(Config.Paint_ImageScale) or 0.5, 0.05, 1)
 	local offX = tonumber(Config.Paint_CanvasOffsetX) or 0
 	local offY = tonumber(Config.Paint_CanvasOffsetY) or 0
@@ -5379,7 +5208,6 @@ local function executePainting()
 
 	local preSurfW, preSurfH = getCanvasInfo(canvas)
 	local imgAspect = PaintState.LoadedImage.Width / math.max(1, PaintState.LoadedImage.Height)
-	-- Пропорции области рисунка на холсте (с учётом масштаба): картинка вписывается в неё без искажений
 	local regionAspect = (preSurfW * imgScale) / math.max(1, preSurfH * imgScale)
 	local fitAspect = math.min(imgAspect, regionAspect) / math.max(imgAspect, regionAspect)
 	local gridW, gridH
@@ -5415,7 +5243,6 @@ local function executePainting()
 		PaintState.OrigCamCFrame = cam.CFrame
 		cam.CameraType = Enum.CameraType.Scriptable
 		local surfW, surfH, normVec, rightVec, downVec = getCanvasInfo(canvas)
-		-- Камера ставится строго над ЦЕНТРОМ рисунка (иначе при уменьшенном масштабе картинка уходит за край экрана)
 		local offXc = tonumber(Config.Paint_CanvasOffsetX) or 0
 		local offYc = tonumber(Config.Paint_CanvasOffsetY) or 0
 		local imgScaleC = math.clamp(tonumber(Config.Paint_ImageScale) or 0.5, 0.05, 1)
@@ -5445,13 +5272,11 @@ local function executePainting()
 
 	task.spawn(function()
 		local surfW, surfH, normVec, rightVec, downVec, thick = getCanvasInfo(canvas)
-		-- Размер рисунка = масштаб от размеров холста; при малом масштабе картинка рисуется компактно
 		local effW = surfW * imgScale
 		local effH = surfH * imgScale
 		local centerPos = canvas.Position + (rightVec * offX) + (downVec * offY)
 		local surfaceOffset = normVec * (thick / 2 + 0.08)
 
-		-- Вписывание рисунка в область (letterbox): сохраняем пропорции фото внутри effW x effH
 		local drawW, drawH = effW, effH
 		if (effW / effH) > (gridW / gridH) then
 			drawW = effH * (gridW / gridH)
@@ -5466,7 +5291,7 @@ local function executePainting()
 		end
 
 		for cIdx, bucket in ipairs(colorBuckets) do
-			if #bucket.Segments == 0 then continue end
+			local skipBucket = (#bucket.Segments == 0)
 			if token ~= PaintState.Token then return end
 
 			PaintState.CurrentColorIdx = cIdx
@@ -5493,7 +5318,7 @@ local function executePainting()
 
 				if paintMethod ~= "Remote" and (not on1 or not on2) then
 					PaintState.CompletedStrokes = PaintState.CompletedStrokes + 1
-					continue
+					do end --[[continue]]
 				end
 
 				if paintMethod ~= "Remote" and on1 and on2 and VIM then
@@ -5547,7 +5372,6 @@ end
 
 Builders.PaintStop = function() stopPainting() end
 
--- ================= ПОСТРОИТЕЛЬ ВКЛАДКИ PAINT В GUI =================
 Builders.Paint = function(parent)
 	parent = parent or SettingsFrame
 	local isModern = (ModernScroll and (parent == ModernScroll or parent:IsDescendantOf(ModernScroll)))
@@ -5555,7 +5379,6 @@ Builders.Paint = function(parent)
 	local dropW = isDrop and (parent.AbsoluteSize.X > 50 and (parent.AbsoluteSize.X - 10) or 165) or nil
 	local btnW = isModern and 690 or (dropW or (parent == SettingsFrame and 450 or 180))
 
-	-- КАРТОЧКА 1: МОНИТОР СТАТУСА И ПРОГРЕСС-БАР
 	local statusCard = Instance.new("Frame", parent)
 	statusCard.Size = UDim2.new(0, btnW, 0, 72)
 	statusCard.BackgroundColor3 = Color3.fromRGB(16, 17, 24)
@@ -5607,7 +5430,6 @@ Builders.Paint = function(parent)
 	rCorner(barFill, 6)
 	table.insert(PaintState.ProgressBarFills, barFill)
 
-	-- СЕКЦИЯ 2: ВЫБОР ИЗОБРАЖЕНИЯ И ЗАГРУЗКА
 	local sep1 = Instance.new("Frame", parent); sep1.Size = UDim2.new(0, btnW, 0, 1); sep1.BackgroundColor3 = Color3.fromRGB(45, 45, 60); sep1.BorderSizePixel = 0
 	local tImg = Instance.new("TextLabel", parent); tImg.Size = UDim2.new(1,0,0,22); tImg.BackgroundTransparency = 1; tImg.Text = "📁 ИСТОЧНИК ИЗОБРАЖЕНИЯ (PNG / BMP / URL)"; tImg.Font = Enum.Font.GothamBold; tImg.TextColor3 = Color3.fromRGB(240,240,255); tImg.TextSize = 12
 
@@ -5664,7 +5486,6 @@ Builders.Paint = function(parent)
 			if showNotification then
 				showNotification("Изображение загружено!", string.format("%s [%dx%d px]", filename, img.Width, img.Height), 2.5, Color3.fromRGB(0, 255, 140))
 			end
-			-- Предпросмотр: рисуем уменьшенную копию картинки прямо в GUI (если доступна граф. библиотека VIM)
 			pcall(function()
 				if not PaintPreviewFrame then return end
 				local gVim = nil
@@ -5743,7 +5564,6 @@ Builders.Paint = function(parent)
 		doLoadImage(pathBox.Text)
 	end)
 
-	-- Фрейм предпросмотра загруженного изображения
 	PaintPreviewFrame = Instance.new("Frame", parent)
 	PaintPreviewFrame.Size = UDim2.new(0, btnW, 0, 170)
 	PaintPreviewFrame.BackgroundColor3 = Color3.fromRGB(14, 14, 20)
@@ -5759,7 +5579,6 @@ Builders.Paint = function(parent)
 	PreviewHint.Font = Enum.Font.Gotham
 	PreviewHint.TextSize = 11
 
-	-- СЕКЦИЯ 3: УПРАВЛЕНИЕ ХОЛСТОМ
 	local sep2 = Instance.new("Frame", parent); sep2.Size = UDim2.new(0, btnW, 0, 1); sep2.BackgroundColor3 = Color3.fromRGB(45, 45, 60); sep2.BorderSizePixel = 0
 	local tCan = Instance.new("TextLabel", parent); tCan.Size = UDim2.new(1,0,0,22); tCan.BackgroundTransparency = 1; tCan.Text = "🎯 НАСТРОЙКА ХОЛСТА И ИНСТРУМЕНТОВ"; tCan.Font = Enum.Font.GothamBold; tCan.TextColor3 = Color3.fromRGB(240,240,255); tCan.TextSize = 12
 
@@ -5792,7 +5611,6 @@ Builders.Paint = function(parent)
 		end
 	end)
 
-	-- СЕКЦИЯ 4: ПАНЕЛЬ ЗАПУСКА ПРИНТЕРА
 	local sep3 = Instance.new("Frame", parent); sep3.Size = UDim2.new(0, btnW, 0, 1); sep3.BackgroundColor3 = Color3.fromRGB(45, 45, 60); sep3.BorderSizePixel = 0
 	local tRun = Instance.new("TextLabel", parent); tRun.Size = UDim2.new(1,0,0,22); tRun.BackgroundTransparency = 1; tRun.Text = "⚡ УПРАВЛЕНИЕ ПЕЧАТЬЮ"; tRun.Font = Enum.Font.GothamBold; tRun.TextColor3 = Color3.fromRGB(0,255,140); tRun.TextSize = 12
 
@@ -5844,7 +5662,6 @@ Builders.Paint = function(parent)
 		stopPainting()
 	end)
 
-	-- СЕКЦИЯ 5: КАЧЕСТВО И НАСТРОЙКИ ПРИНТЕРА
 	local sep4 = Instance.new("Frame", parent); sep4.Size = UDim2.new(0, btnW, 0, 1); sep4.BackgroundColor3 = Color3.fromRGB(45, 45, 60); sep4.BorderSizePixel = 0
 	local tSet = Instance.new("TextLabel", parent); tSet.Size = UDim2.new(1,0,0,22); tSet.BackgroundTransparency = 1; tSet.Text = "⚙ НАСТРОЙКИ КАЧЕСТВА И СКОРОСТИ"; tSet.Font = Enum.Font.GothamBold; tSet.TextColor3 = Color3.fromRGB(240,240,255); tSet.TextSize = 12
 
@@ -5888,7 +5705,6 @@ end
 
 end
 
--- ================= ИНИЦИАЛИЗАЦИЯ ВКЛАДОК MAIN MENU =================
 local function buildMainTab(name, logicFunc)
 	local btn = Instance.new("TextButton", TabsFrame); btn.Size = UDim2.new(1, -10, 0, 35); btn.BackgroundColor3 = ActiveTheme.Btn; btn.BackgroundTransparency = 0.1; btn.Text = "   " .. name; btn.TextColor3 = Color3.fromRGB(255,255,255); btn.Font = Enum.Font.GothamSemibold; btn.TextSize = 13; btn.TextXAlignment = Enum.TextXAlignment.Left; rCorner(btn, 6)
 	local ind = Instance.new("Frame", btn); ind.Name = "Indicator"; ind.Size = UDim2.new(0, 3, 0, 0); ind.Position = UDim2.new(0, 3, 0.5, 0); ind.AnchorPoint = Vector2.new(0, 0.5); ind.BackgroundColor3 = ActiveTheme.Accent; ind.BorderSizePixel = 0; rCorner(ind, 2)
@@ -6192,4 +6008,3 @@ end
 
 RefreshUI()
 
--- [заметка пользователя] видишь єтот скрипт на роблокс луа через Хено, раздел паинт можно добавить что б не фулл холст ресиловался а небольшая часть а то начало рисовать и нарисовало єто просто полоски на фулл холст
