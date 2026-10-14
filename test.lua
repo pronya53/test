@@ -31,6 +31,9 @@ local Config = {
 	Paint_Active = false, Paint_FilePath = "", Paint_Scale = 1, Paint_Delay = 0.02,
 	Paint_Quality = "High", Paint_StartX = 0, Paint_StartY = 0, Paint_SkipWhite = true,
 	Paint_MaxWidth = 400, Paint_MaxHeight = 400, Paint_BrushSize = 0.4, Paint_Dithering = false,
+	Paint_ImageScale = 0.5, -- размер рисунка относительно холста (0.05..1)
+	Paint_CanvasOffsetX = 0, Paint_CanvasOffsetY = 0, -- сдвиг центра рисунка на холсте (studs)
+	Paint_Method = "Input", -- Input (VIM-клики поверх окна), Remote, Mouse
 	SpectateCam = false,
 	
 	XRay = false, FullBright = false, NightMode = false, Wireframe = false, FOV = false, FOVValue = 90, ThemeFog = false, AestheticWorld = false,
@@ -4318,11 +4321,36 @@ local function getCanvasInfo(part)
 		normal = -normal
 	end
 
+	-- ВАЖНО: нормаль (вверх над поверхностью) должна быть ПЕРПЕНДИКУЛЯРНА right/forward.
+	-- Раньше для вертикальных холстов (стенд/мольберт, ось Z) в пару брались UpVector и RightVector —
+	-- они лежат в одной плоскости с нормалью, из-за чего точки рисунка "схлопывались" в линию на полу.
+	local rightV = best.right
+	local fwdV = best.forward
+	local function isPerp(v)
+		return math.abs(v:Dot(normal)) < 0.35
+	end
+	if not isPerp(rightV) or not isPerp(fwdV) then
+		-- подбираем корректный ортонормированный базис в плоскости поверхности
+		local anyAxis = (math.abs(normal.X) < 0.9) and Vector3.xAxis or Vector3.yAxis
+		rightV = normal:Cross(anyAxis).Unit
+		fwdV = normal:Cross(rightV).Unit
+		-- согласовываем размеры: width вдоль rightV, height вдоль fwdV
+		local wProj = math.abs(sz.X * rightV.X) + math.abs(sz.Y * rightV.Y) + math.abs(sz.Z * rightV.Z)
+		local hProj = math.abs(sz.X * fwdV.X) + math.abs(sz.Y * fwdV.Y) + math.abs(sz.Z * fwdV.Z)
+		local surfW0 = math.max(best.rightSz, 8)
+		local surfH0 = math.max(best.fwdSz, 8)
+		if wProj < hProj then
+			rightV, fwdV = fwdV, rightV
+			surfW0, surfH0 = surfH0, surfW0
+		end
+		return surfW0, surfH0, normal, rightV, fwdV, math.max(best.sz, 0.05)
+	end
+
 	local surfW = math.max(best.rightSz, 8)
 	local surfH = math.max(best.fwdSz, 8)
 	local thickness = math.max(best.sz, 0.05)
 
-	return surfW, surfH, normal, best.right, best.forward, thickness
+	return surfW, surfH, normal, rightV, fwdV, thickness
 end
 
 -- ================= УПРАВЛЕНИЕ ИНСТРУМЕНТАМИ И ЦВЕТОМ =================
@@ -4389,7 +4417,24 @@ local function setInGameColor(c3)
 		end
 	end)
 
-	-- 2. Вызов RemoteEvent для цвета, если доступен
+	-- 2. Ползунки RGB в PlayerGui (типичный UI растровых холстов в Roblox)
+	pcall(function()
+		local pg = player:FindFirstChild("PlayerGui")
+		if not pg then return end
+		for _, desc in ipairs(pg:GetDescendants()) do
+			if desc:IsA("Slider") then
+				local n = desc.Name:lower()
+				if n:find("red") or n == "r" then
+					desc:SetValue(r / 255)
+				elseif n:find("green") or n == "g" then
+					desc:SetValue(g / 255)
+				elseif n:find("blue") or n == "b" then
+					desc:SetValue(b / 255)
+				end
+			end
+	end)
+
+	-- 3. Вызов RemoteEvent для цвета, если доступен
 	pcall(function()
 		local tool = equipBrushTool()
 		local checkRemotes = {}
@@ -4449,6 +4494,8 @@ local function clearInGameCanvas()
 	end)
 
 	if found then
+		PaintState.CompletedStrokes = 0
+		setPaintStatus("Холст очищен.", 0)
 		if showNotification then showNotification("Paint Bot", "Холст очищен!", 2, Color3.fromRGB(0, 220, 255)) end
 	else
 		if showNotification then showNotification("Paint Bot", "Кнопка очистки не найдена в UI.", 2, Color3.fromRGB(255, 120, 120)) end
@@ -5176,17 +5223,31 @@ local function prepareDrawBatches(img, targetW, targetH, paletteSize, skipWhite)
 	local origW = img.Width
 	local origH = img.Height
 
+	-- Box-filter усреднение (артефактов «шаха» от point-sampling больше нет)
 	local grid = {}
 	for y = 1, targetH do
 		grid[y] = {}
-		local srcY = math.clamp(math.floor((y - 0.5) * (origH / targetH) + 1), 1, origH)
+		local sy0 = math.max(1, math.floor((y - 1) * (origH / targetH)) + 1)
+		local sy1 = math.min(origH, math.ceil(y * (origH / targetH)))
 		for x = 1, targetW do
-			local srcX = math.clamp(math.floor((x - 0.5) * (origW / targetW) + 1), 1, origW)
-			local col, alpha = img:GetPixel(srcX, srcY)
-			if (alpha or 1) < 0.25 then
-				grid[y][x] = Color3.new(1, 1, 1)
+			local sx0 = math.max(1, math.floor((x - 1) * (origW / targetW)) + 1)
+			local sx1 = math.min(origW, math.ceil(x * (origW / targetW)))
+			local rSum, gSum, bSum, cnt = 0, 0, 0, 0
+			for sy = sy0, sy1 do
+				for sx = sx0, sx1 do
+					local col, alpha = img:GetPixel(sx, sy)
+					if col and (alpha or 1) >= 0.25 then
+						rSum = rSum + col.R
+						gSum = gSum + col.G
+						bSum = bSum + col.B
+						cnt = cnt + 1
+					end
+				end
+			end
+			if cnt > 0 then
+				grid[y][x] = Color3.new(rSum / cnt, gSum / cnt, bSum / cnt)
 			else
-				grid[y][x] = col or Color3.new(1, 1, 1)
+				grid[y][x] = Color3.new(1, 1, 1)
 			end
 		end
 	end
@@ -5289,10 +5350,25 @@ local function executePainting()
 	local paletteSize = math.clamp(tonumber(Config.Paint_PaletteSize) or 24, 6, 64)
 	local skipWhite = (Config.Paint_SkipWhite ~= false)
 	local delayTime = math.max(0.003, tonumber(Config.Paint_Delay) or 0.015)
+	-- Масштаб рисунка относительно холста (можно уменьшить, чтобы не рисовать на весь холст)
+	local imgScale = math.clamp(tonumber(Config.Paint_ImageScale) or 0.5, 0.05, 1)
+	local offX = tonumber(Config.Paint_CanvasOffsetX) or 0
+	local offY = tonumber(Config.Paint_CanvasOffsetY) or 0
+	local paintMethod = tostring(Config.Paint_Method or "Input")
 
-	local aspect = PaintState.LoadedImage.Width / math.max(1, PaintState.LoadedImage.Height)
-	local gridW = targetRes
-	local gridH = math.clamp(math.floor(targetRes / aspect), 20, 200)
+	local preSurfW, preSurfH = getCanvasInfo(canvas)
+	local canvasAspect = preSurfW / math.max(1, preSurfH)
+	local imgAspect = PaintState.LoadedImage.Width / math.max(1, PaintState.LoadedImage.Height)
+	-- Сетка подгоняется и под пропорции картинки, и под пропорции холста (без искажений)
+	local combinedAspect = math.sqrt(imgAspect * canvasAspect)
+	local gridW, gridH
+	if combinedAspect >= 1 then
+		gridW = targetRes
+		gridH = math.clamp(math.round(targetRes / combinedAspect), 20, 200)
+	else
+		gridH = targetRes
+		gridW = math.clamp(math.round(targetRes * combinedAspect), 20, 200)
+	end
 
 	local colorBuckets, palette, totalSegments = prepareDrawBatches(
 		PaintState.LoadedImage,
@@ -5317,9 +5393,9 @@ local function executePainting()
 		PaintState.OrigCamType = cam.CameraType
 		PaintState.OrigCamCFrame = cam.CFrame
 		cam.CameraType = Enum.CameraType.Scriptable
-		local surfW, surfH, normVec = getCanvasInfo(canvas)
+		local surfW, surfH, normVec, rightVec, fwdVec = getCanvasInfo(canvas)
 		local camHeight = math.max(surfW, surfH) * 1.05
-		cam.CFrame = CFrame.new(canvas.Position + (normVec * camHeight), canvas.Position)
+		cam.CFrame = CFrame.lookAt(canvas.Position + (normVec * camHeight), canvas.Position, fwdVec)
 		task.wait(0.2)
 	end
 
@@ -5343,14 +5419,16 @@ local function executePainting()
 
 	task.spawn(function()
 		local surfW, surfH, normVec, rightVec, fwdVec, thick = getCanvasInfo(canvas)
-		local effW = surfW * 0.88
-		local effH = surfH * 0.88
+		-- Размер рисунка = масштаб от размеров холста; при малом масштабе картинка рисуется компактно
+		local effW = surfW * imgScale
+		local effH = surfH * imgScale
+		local centerPos = canvas.Position + (rightVec * offX) + (fwdVec * offY)
 		local surfaceOffset = normVec * (thick / 2 + 0.08)
 
 		local function gridToWorld(gx, gy)
 			local u = (gx - 0.5) / gridW - 0.5
 			local v = (gy - 0.5) / gridH - 0.5
-			return canvas.Position + surfaceOffset + (rightVec * (u * effW)) + (fwdVec * (v * effH))
+			return centerPos + surfaceOffset + (rightVec * (u * effW)) + (fwdVec * (v * effH))
 		end
 
 		for cIdx, bucket in ipairs(colorBuckets) do
@@ -5370,7 +5448,7 @@ local function executePainting()
 				local pStart = gridToWorld(seg.StartX, seg.Y)
 				local pEnd = gridToWorld(seg.EndX, seg.Y)
 
-				if drawRemote and Config.Paint_Method ~= "Mouse" then
+				if drawRemote and paintMethod == "Remote" then
 					pcall(function()
 						drawRemote:FireServer(pStart, pEnd, bucket.Color, 0.1)
 					end)
@@ -5379,7 +5457,12 @@ local function executePainting()
 				local s1, on1 = cam:WorldToViewportPoint(pStart)
 				local s2, on2 = cam:WorldToViewportPoint(pEnd)
 
-				if on1 and on2 and VIM then
+				if paintMethod ~= "Remote" and (not on1 or not on2) then
+					PaintState.CompletedStrokes = PaintState.CompletedStrokes + 1
+					continue
+				end
+
+				if paintMethod ~= "Remote" and on1 and on2 and VIM then
 					if math.abs(s1.X - s2.X) < 3 and math.abs(s1.Y - s2.Y) < 3 then
 						VIM:SendMouseButtonEvent(s1.X, s1.Y, 0, true, game, 0)
 						task.wait(0.003)
@@ -5391,7 +5474,7 @@ local function executePainting()
 						task.wait(0.003)
 						VIM:SendMouseButtonEvent(s2.X, s2.Y, 0, false, game, 0)
 					end
-				elseif on1 and mouse1click then
+				elseif paintMethod ~= "Remote" and on1 and mouse1click then
 					pcall(function()
 						mousemoveabs(s1.X, s1.Y)
 						mouse1click()
@@ -5509,6 +5592,8 @@ Builders.Paint = function(parent)
 	pbStroke.Color = Color3.fromRGB(50, 50, 75); pbStroke.Thickness = 1
 	pathBox.FocusLost:Connect(function() Config.Paint_FilePath = pathBox.Text end)
 
+	local PaintPreviewImage = nil
+	local PaintPreviewFrame, PreviewHint
 	local function doLoadImage(targetPath)
 		setPaintStatus("Загрузка и парсинг изображения...")
 		task.spawn(function()
@@ -5545,6 +5630,38 @@ Builders.Paint = function(parent)
 			if showNotification then
 				showNotification("Изображение загружено!", string.format("%s [%dx%d px]", filename, img.Width, img.Height), 2.5, Color3.fromRGB(0, 255, 140))
 			end
+			-- Предпросмотр: рисуем уменьшенную копию картинки прямо в GUI (если доступна граф. библиотека VIM)
+			pcall(function()
+				if not PaintPreviewFrame then return end
+				local gVim = nil
+				pcall(function() gVim = getgenv().VIM or _G.VIM end)
+				if type(gVim) ~= "table" and type(gVim) ~= "userdata" then gVim = nil end
+				if gVim and gVim.CreateCanvas then
+					local dsW, dsH = 160, math.max(1, math.floor(160 * (img.Height / math.max(1, img.Width))))
+					if img.Height > img.Width then dsH = 160; dsW = math.max(1, math.floor(160 * (img.Width / math.max(1, img.Height)))) end
+					local cv = gVim:CreateCanvas(dsW, dsH)
+					for py = 0, dsH - 1 do
+						local srcY = math.clamp(math.floor(py * (img.Height / dsH)) + 1, 1, img.Height)
+						for px = 0, dsW - 1 do
+							local srcX = math.clamp(math.floor(px * (img.Width / dsW)) + 1, 1, img.Width)
+							local col, alpha = img:GetPixel(srcX, srcY)
+							if col and (alpha or 1) >= 0.25 then
+								cv:SetPixel(px, py, col)
+							else
+								cv:SetPixel(px, py, Color3.fromRGB(28, 28, 38))
+							end
+						end
+					end
+					if PaintPreviewImage then PaintPreviewImage:Destroy() end
+					PaintPreviewImage = cv:GetImageLabel()
+					PaintPreviewImage.Parent = PaintPreviewFrame
+					PaintPreviewImage.Size = UDim2.new(0, dsW, 0, dsH)
+					PaintPreviewImage.Position = UDim2.new(0.5, -dsW / 2, 0.5, -dsH / 2)
+					if PreviewHint then PreviewHint.Text = "" end
+				elseif PreviewHint then
+					PreviewHint.Text = "Картинка загружена (предпросмотр недоступен)"
+				end
+			end)
 		end)
 	end
 
@@ -5591,6 +5708,22 @@ Builders.Paint = function(parent)
 		pathBox.Text = "https://i.imgur.com/5h8hXmD.png"
 		doLoadImage(pathBox.Text)
 	end)
+
+	-- Фрейм предпросмотра загруженного изображения
+	PaintPreviewFrame = Instance.new("Frame", parent)
+	PaintPreviewFrame.Size = UDim2.new(0, btnW, 0, 170)
+	PaintPreviewFrame.BackgroundColor3 = Color3.fromRGB(14, 14, 20)
+	PaintPreviewFrame.BackgroundTransparency = 0.05
+	rCorner(PaintPreviewFrame, 6)
+	local ppStroke = Instance.new("UIStroke", PaintPreviewFrame)
+	ppStroke.Color = Color3.fromRGB(50, 50, 75); ppStroke.Thickness = 1; ppStroke.Transparency = 0.3
+	PreviewHint = Instance.new("TextLabel", PaintPreviewFrame)
+	PreviewHint.Size = UDim2.new(1, 0, 1, 0)
+	PreviewHint.BackgroundTransparency = 1
+	PreviewHint.Text = "Здесь появится предпросмотр после загрузки"
+	PreviewHint.TextColor3 = Color3.fromRGB(110, 110, 140)
+	PreviewHint.Font = Enum.Font.Gotham
+	PreviewHint.TextSize = 11
 
 	-- СЕКЦИЯ 3: УПРАВЛЕНИЕ ХОЛСТОМ
 	local sep2 = Instance.new("Frame", parent); sep2.Size = UDim2.new(0, btnW, 0, 1); sep2.BackgroundColor3 = Color3.fromRGB(45, 45, 60); sep2.BorderSizePixel = 0
@@ -5691,6 +5824,27 @@ Builders.Paint = function(parent)
 
 	createTextBox(parent, "Задержка штриха (сек)", tostring(Config.Paint_Delay or 0.015), function(v)
 		Config.Paint_Delay = math.clamp(tonumber(v) or 0.015, 0.002, 0.2)
+	end)
+
+	createTextBox(parent, "Размер фото на холсте (0.05 - 1)", tostring(Config.Paint_ImageScale or 0.5), function(v)
+		Config.Paint_ImageScale = math.clamp(tonumber(v) or 0.5, 0.05, 1)
+	end)
+
+	createTextBox(parent, "Сдвиг рисунка по горизонтали (studs)", tostring(Config.Paint_CanvasOffsetX or 0), function(v)
+		Config.Paint_CanvasOffsetX = tonumber(v) or 0
+	end)
+
+	createTextBox(parent, "Сдвиг рисунка по вертикали (studs)", tostring(Config.Paint_CanvasOffsetY or 0), function(v)
+		Config.Paint_CanvasOffsetY = tonumber(v) or 0
+	end)
+
+	addToggle(parent, "Выбор метода рисования", "Paint_MethodPopup", nil, function(p)
+		for _, m in ipairs({"Input", "Remote", "Mouse"}) do
+			createButton(p, "Метод: " .. m, 200, function(b)
+				Config.Paint_Method = m
+					b.Text = "✔ Метод: " .. m
+			end)
+		end
 	end)
 
 	addToggle(parent, "Пропускать белый фон холста", "Paint_SkipWhite")
